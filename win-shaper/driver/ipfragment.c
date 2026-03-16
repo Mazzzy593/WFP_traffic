@@ -682,9 +682,10 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 						ULONG tmpTotalLen = bytestocopy + ipHeaderInfo->HeaderLength;
 						FragmentOffset = nbIP_FragmentOffset + (i * SELF_MTUpayloadLen) / 8;
 						if (remainDataLen > 0)
-							tmpFlags = 0b00100000;	// 最后一片之前的flags必须是001
+							tmpFlags = 0b00100000;	
+
 						else 
-							tmpFlags = nbIP_Flags;	// 最后一片的flags应该维持初始的flags
+							tmpFlags = nbIP_Flags;	
 
 						updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, tmpTotalLen, tmpFlags, FragmentOffset);
 					}
@@ -699,14 +700,61 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 			
 		}
 
-		if (remainDataLen != 0)	// 最后做一个简单判断，如果合理就return TRUE
+		if (remainDataLen != 0)	
 			return FALSE;
 		else
 			return TRUE;
 	}
-	///////////////// 后续NB的处理 -end/////////////////////////////////////////////////////////////////////////////////////////////////
+
 }
 
 
+
+ULONG total_packet_count = 0;
+ULONG total_NBL_mix_count = 0;
+
+
+
+
+
+VOID zzpTypeOfNBLTest(_Inout_opt_ void* layerdata)
+{
+
+	//ULONG packet_count = 0;
+	ULONG current_packet_count = 0;
+	ULONG current_NBL_IPv4_count = 0;
+
+	
+	PNET_BUFFER buffer = NET_BUFFER_LIST_FIRST_NB((PNET_BUFFER_LIST)layerdata);
+
+	if (!buffer)
+		return;
+
+	while (buffer) {
+		total_packet_count++;
+		current_packet_count++;
+		PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(buffer), NormalPagePriority);
+		PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(buffer);
+		
+		if (NetBufferData[12] == 0x08 && NetBufferData[13] == 0x00){
+			current_NBL_IPv4_count++;
+		}
+		
+		if (total_packet_count % 60 == 0) {
+			DbgPrint("total_packet_count:%d,total_NBL_mix_count:%d,\n", total_packet_count, total_NBL_mix_count);
+		}
+		//data_length += NET_BUFFER_DATA_LENGTH(buffer);
+		buffer = NET_BUFFER_NEXT_NB(buffer);
+	}
+	
+	if (current_packet_count > 1 && current_NBL_IPv4_count < current_packet_count){
+		total_NBL_mix_count++;
+	}
+
+	if (current_packet_count > 1) {
+		DbgPrint("current_packet_count:%d,current_NBL_IPv4_count:%d\n", current_packet_count, current_NBL_IPv4_count);
+	}
+
+}
 
 
