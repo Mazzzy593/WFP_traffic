@@ -72,3 +72,44 @@ VOID IPV4_HEADER_INIT(IPV4_HEADER* ipH, PUCHAR ipP)  // 通过ipPacket，填充IPV4_H
 	ipH->SrcAddress = (ULONG)((ipP[12] << 24) | (ipP[13] << 16) | (ipP[14] << 8) | ipP[15]);
 	ipH->DesAddress = (ULONG)((ipP[16] << 24) | (ipP[17] << 16) | (ipP[18] << 8) | ipP[19]);
 }
+
+
+static UINT16 GetIpCheckSum(PUCHAR ipHeader, UINT16 ipHeaderLen)	// 计算UINT16类型的IP首部checksum
+{
+	int cksum = 0;
+	int index = 0;
+	*(ipHeader + 10) = 0;
+	*(ipHeader + 11) = 0;
+	if (ipHeaderLen % 2 != 0)
+		return 0;
+	while (index < ipHeaderLen)
+	{
+		cksum += *(ipHeader + index + 1);
+		cksum += *(ipHeader + index) << 8;
+		index += 2;
+	}
+	while (cksum > 0xffff)
+	{
+		cksum = (cksum >> 16) + (cksum & 0xffff);
+	}
+	return ~cksum;
+}
+
+VOID updateIPHeader(PUCHAR ipHeader,UINT16 headerLength,ULONG totalLength,UCHAR Flags,UINT32 FragmentOffset)
+{
+	// 根据提供的参数，更新IP数据包的首部信息
+	// update ipH
+	ipHeader[2] = *(((PUCHAR)(&totalLength)) + 1);
+	ipHeader[3] = *(((PUCHAR)(&totalLength)));			// 更新totallength
+	ipHeader[6] = *(((PUCHAR)(&FragmentOffset)) + 1);	// 因为是首片，所以暂时不用更新fragmentOffset
+	ipHeader[7] = *((PUCHAR)(&FragmentOffset));
+
+	ipHeader[6] &= 0b00011111;	// 先清零
+	ipHeader[6] |= Flags;		// 添加flag
+
+	// 更新首部校验和
+	UINT16 checksum = GetIpCheckSum(ipHeader, headerLength);	// 要检验头部check能否算对
+	//UINT16 checksum = WinDivertCalcChecksum(NULL, 0, ipHeader, ipHeaderInfo->HeaderLength);
+	ipHeader[10] = *(((PUCHAR)(&checksum)) + 1);
+	ipHeader[11] = *(((PUCHAR)(&checksum)));
+}
