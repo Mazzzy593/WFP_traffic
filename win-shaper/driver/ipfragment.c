@@ -529,4 +529,125 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 		}
 	}
 
-	
+	///////////////////进行第一块NB的处理 --end ////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////// 处理完第一个NB后，单独进行后续NB的处理 --begin////////////////////////////////////////////////////////////////////
+	if (remainDataLen != 0){
+		return FALSE;		// 如果remainDataLen不是0，说明处理失败
+	}
+	else {	
+		// 正确处理完第一个NB后，着手处理后面的NB，这种情况一般来说不多见，
+		// 但是如果我们ping一个大于1472的数据包，一个NBL就会有多个NB
+		nb = NET_BUFFER_NEXT_NB(nb);
+		if (nb == NULL)
+			return TRUE;
+
+		// 此时我们有额外的NB需要处理，进入while循环
+		while (nb)
+		{
+			BOOLEAN StraightCopyFlag = FALSE;
+			currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(nb), NormalPagePriority);
+			NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
+
+			if (!(NetBufferData[12] == 0x08 && NetBufferData[13] == 0x00)) {
+				StraightCopyFlag = TRUE;		// 这种情况几乎见不到，但是理论上我们也能处理，直接copy NB.datalength长的数据过去就可以
+			}
+			else {
+				IPV4_HEADER_INIT(ipHeaderInfo, NetBufferData + 14);	// 只有IPV4协议的，才会进入初始化IPH
+				if (ipHeaderInfo->TotalLength <= randomMTU)
+					StraightCopyFlag = TRUE;	// 如果IP包的长度不足SELF_MTU,同样也是直接复制
+			}	
+			if (StraightCopyFlag)
+			{
+				// 通过Allocate配合Retreat，得到带有适当长度MDL的NB
+				PNET_BUFFER newNB = NdisAllocateNetBufferMdlAndData(nbPoolHandle);
+				status = NdisRetreatNetBufferDataStart(newNB, nb->DataLength, 0, 0);
+				if (!NT_SUCCESS(status))
+					return FALSE;
+
+				// 先把MAC首部和IP首部复制到对应位置
+				bytestocopy = nb->DataLength;			// 需要复制NB的所有data
+				DestionationOffset = 0;					// 设置为0
+				SourceOffset = 0;						// 从nb的起始位置开始复制
+				NdisCopyFromNetBufferToNetBuffer(newNB, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+				if (bytescopied != bytestocopy)			// 判断复制是否成功
+					return FALSE;
+
+				newNB->DataLength = nb->DataLength;
+				newNB->CurrentMdl->ByteCount = newNB->DataLength + newNB->CurrentMdlOffset;
+				remainDataLen = 0;
+
+				// 经过测试，这里要我们自己填写，直接复制之后，IPcheck字段为0，但是wireshark抓包看到的不是0，
+				// 可能是网卡会在最后检查IPcheck是否为0，如果为0会自动计算，但是我们自己构造的NBL，网卡没有为我们计算check
+				if (ipHeaderInfo->TotalLength <= randomMTU) {
+					// get iph
+					PVOID tmpMdlStart = MmGetSystemAddressForMdlSafe(newNB->CurrentMdl, NormalPagePriority);
+					if (!tmpMdlStart)
+						return FALSE;
+					PUCHAR ipHeader = (PUCHAR)tmpMdlStart + newNB->CurrentMdlOffset + 14;
+					UINT16 checksum = GetIpCheckSum(ipHeader, ipHeaderInfo->HeaderLength);	// 要检验头部check能否算对
+					ipHeader[10] = *(((PUCHAR)(&checksum)) + 1);
+					ipHeader[11] = *(((PUCHAR)(&checksum)));
+				}
+
+				NET_BUFFER_NEXT_NB(currentNB) = newNB;
+				currentNB = NET_BUFFER_NEXT_NB(currentNB);
+
+				nb = NET_BUFFER_NEXT_NB(nb);			
+				continue;		// 离开本次while循环
+			}
+			else {	// StraightCopyFlag为false，意味当前NB需要进行IP分片
+				if (ipHeaderInfo->Flags == 0 || ipHeaderInfo->Flags == 2)		// 如果原IP数据包不允许分片即DF位=1，我们就手动置DF为0
+					nbIP_Flags = 0b00000000;		// 源 IP flags
+				else if (ipHeaderInfo->Flags == 1)								
+					nbIP_Flags = 0b00100000;
+				else
+					return FALSE; // IP数据包Flags只有三种情况，其他情况不做处理
+
+				nbIP_FragmentOffset = ipHeaderInfo->FragmentOffset;
+
+				SELF_MTUpayloadLen = (randomMTU - ipHeaderInfo->HeaderLength) & 0xFFF8;	// 单个IP数据包，除去IP首部后的payload长度.因为分片的字节偏移必须是8的整数倍
+				SELF_MTUDataLen = SELF_MTUpayloadLen + ipHeaderInfo->HeaderLength;		// 单个IP数据包，包括IP首部的总长度
+				SELF_MTUandMACSize = SELF_MTUDataLen + 14;								// 单个IP数据包，包括IP首部和MAC帧头的长度
+				SELF_MDLDataSize = SELF_MTUandMACSize + 0x20;							// 单个MDL的最小容量（留有0x20的冗余）
+				SELF_nbDataLength = SELF_MDLDataSize;									// 单个NET_BUFFER的datalength
+				SELF_MACHandIPHLen = 14 + ipHeaderInfo->HeaderLength;					// MAC帧头加IP首部的长度（多数情况下固定，但IP首部可能长度不一）
+				// 确定分片数量
+				totalPayloadLength = ipHeaderInfo->TotalLength - ipHeaderInfo->HeaderLength;
+				MaxFragmentNum = (totalPayloadLength % SELF_MTUpayloadLen) > 0 ? (totalPayloadLength / SELF_MTUpayloadLen + 1) : totalPayloadLength / SELF_MTUpayloadLen;
+				// 当前NB中还需要拷贝的payload长度(不包括MAC头部和IP头部!!!!!)
+				remainDataLen = ipHeaderInfo->TotalLength - ipHeaderInfo->HeaderLength;
+
+				for (UINT i = 0; i < MaxFragmentNum; i++) {
+					// 通过Allocate配合Retreat，得到带有适当长度MDL的NB
+					PNET_BUFFER newNB = NdisAllocateNetBufferMdlAndData(nbPoolHandle);
+					status = NdisRetreatNetBufferDataStart(newNB, SELF_nbDataLength, 0, 0);
+					if (!NT_SUCCESS(status))
+						return FALSE;
+
+					if (i == 0) {	// 此处也要考虑第一个分片单独情况
+						bytestocopy = SELF_MTUandMACSize;	// 需要copy MAC头部、IP头部外加能整除8的payload长
+						DestionationOffset = 0;				//DestionationOffset=0,SourceOffset=0
+						SourceOffset = 0;
+						NdisCopyFromNetBufferToNetBuffer(newNB, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+						if (bytescopied != bytestocopy)			// 判断复制是否成功
+							return FALSE;
+						newNB->DataLength = SELF_MTUandMACSize;
+						newNB->CurrentMdl->ByteCount = newNB->DataLength + newNB->CurrentMdlOffset;
+						remainDataLen -= SELF_MTUpayloadLen;	// 注意，第一个分片携带的数据长度是SELF_MTUpayloadLen
+
+						// get ipH
+						PVOID tmpMdlStart = MmGetSystemAddressForMdlSafe(newNB->CurrentMdl, NormalPagePriority);
+						if (!tmpMdlStart)
+							return FALSE;
+						PUCHAR ipHeader = (PUCHAR)tmpMdlStart + newNB->CurrentMdlOffset + 14;
+
+						// update ipH
+						// 如果当前数据包没有被分片，那么FragmentOffset应该设置0，
+						// 如果当前数据包已经被分片了，FragmentOffset是原始的nbIP_FragmentOffset
+						// 而flag则一定设置为001
+						UCHAR tmpFlags = 0b00100000;
+						updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, SELF_MTUDataLen, tmpFlags, nbIP_FragmentOffset);
+					}
+
+					
