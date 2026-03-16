@@ -89,3 +89,62 @@ void IPClassify(
 }
 
 
+
+__drv_allocatesMem(Mem)
+TL_INSPECT_PENDED_PACKET*
+AllocateAndInitializePendedPacket(
+	_In_ const FWPS_INCOMING_VALUES* inFixedValues,
+	_In_ const FWPS_INCOMING_METADATA_VALUES* inMetaValues,
+	_Inout_opt_ void* layerData
+)
+{
+	TL_INSPECT_PENDED_PACKET* pendedPacket = ExAllocatePoolWithTag(
+		NonPagedPool,
+		sizeof(TL_INSPECT_PENDED_PACKET),
+		TCPCALLOUT_POOL_TAG
+	);
+
+	if (pendedPacket == NULL)
+		return NULL;
+
+	RtlZeroMemory(pendedPacket, sizeof(TL_INSPECT_PENDED_PACKET));
+
+	if (inFixedValues->layerId == FWPS_LAYER_OUTBOUND_IPPACKET_V4) {
+		pendedPacket->direction = FWP_DIRECTION_OUTBOUND;
+	}
+	else {
+		pendedPacket->direction = FWP_DIRECTION_INBOUND;
+	}
+
+	if (layerData != NULL)
+	{
+		pendedPacket->netBufferList = layerData;
+	}
+
+	NT_ASSERT(FWPS_IS_METADATA_FIELD_PRESENT(inMetaValues,
+		FWPS_METADATA_FIELD_COMPARTMENT_ID));
+	pendedPacket->compartmentId = inMetaValues->compartmentId;
+
+	if (pendedPacket->direction == FWP_DIRECTION_OUTBOUND)
+	{
+	}
+	else
+	{
+		pendedPacket->interfaceIndex =
+			inFixedValues->incomingValue[
+				FWPS_FIELD_INBOUND_IPPACKET_V4_INTERFACE_INDEX].value.uint32;
+		pendedPacket->subInterfaceIndex =
+			inFixedValues->incomingValue[
+				FWPS_FIELD_INBOUND_IPPACKET_V4_SUB_INTERFACE_INDEX].value.uint32;
+
+		NT_ASSERT(FWPS_IS_METADATA_FIELD_PRESENT(inMetaValues,
+			FWPS_METADATA_FIELD_IP_HEADER_SIZE));
+		pendedPacket->ipHeaderSize = inMetaValues->ipHeaderSize;
+	}
+
+	return pendedPacket;
+}
+
+
+
+
