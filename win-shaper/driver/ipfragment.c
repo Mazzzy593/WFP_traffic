@@ -113,3 +113,194 @@ VOID updateIPHeader(PUCHAR ipHeader,UINT16 headerLength,ULONG totalLength,UCHAR 
 	ipHeader[10] = *(((PUCHAR)(&checksum)) + 1);
 	ipHeader[11] = *(((PUCHAR)(&checksum)));
 }
+
+
+BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyLayerdata, UINT MACPadLen)
+{
+#ifdef DEBUG
+	if (DEBUGFLAG){
+		DbgBreakPoint();
+		DEBUGFLAG = FALSE;
+	}
+#endif
+	LARGE_INTEGER now = KeQueryPerformanceCounter(NULL);
+	ULONG random = RtlRandomEx(&now.LowPart) % 100;
+	if (random > SELF_IPFragmentRate)
+		return FALSE;
+
+	UINT SELF_MTU = SELF_MTUmin + RtlRandomEx(&now.LowPart) % (SELF_MTUmax - SELF_MTUmin);	// 随机化MTU
+
+	NTSTATUS status;
+	PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB((PNET_BUFFER_LIST)layerData);// inbound 一个NBL只有一个NB
+	// 调整nb的指针位置，因为进栈流量本身是指向IP头的开始，
+	// 这里本质是调整了datalength和currentmdloffset，return之后要重新advance处理
+	status = NdisRetreatNetBufferDataStart(nb, 14, 0, 0);
+
+	PNET_BUFFER_LIST currentNBL = NULL;
+	PIPV4_HEADER ipHeaderInfo = (PIPV4_HEADER)ExAllocatePoolWithTag(NonPagedPool, sizeof(IPV4_HEADER), CLONE_DATA_POOL_TAG);
+	ULONG MaxFragmentNum = 0;
+	ULONG remainDataLen = 0;
+	UINT32 FragmentOffset = 0;	// 单位是(8bytes)，用于记录当前构造的新NB的offset
+	UCHAR tmpFlags = 0;			// 用于记录当前构造的新NB的flags
+
+	// NdisCopyFromNetBufferToNetBuffer函数要用的参数变量
+	ULONG bytestocopy = 0;
+	ULONG bytescopied = 0;
+	ULONG DestionationOffset = 0;
+	ULONG SourceOffset = 0;
+
+	PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(nb), NormalPagePriority);
+	PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
+
+	// 筛选需要被分片的NB，不需要分片的直接return False
+	if (!(NetBufferData[12] == 0x08 && NetBufferData[13] == 0x00))  // 12和13是MAC frame type字段，0800代表内部是IPv4数据
+		return FALSE;												// 非IPv4的数据包不做处理
+	IPV4_HEADER_INIT(ipHeaderInfo, NetBufferData + 14);				// MAC首部大小为14字节，+14后就是IP首部的开始位置
+	if (ipHeaderInfo->TotalLength <= SELF_MTU)						// 小于SELF_MTU的数据包不作处理
+		return FALSE;
+
+	UCHAR nbIP_Flags = 0;
+	if (ipHeaderInfo->Flags == 0 || ipHeaderInfo->Flags == 2) 		// 如果原IP数据包不允许分片，那我们就手动置DF为0
+		nbIP_Flags = 0b00000000;
+	else if (ipHeaderInfo->Flags == 1)	// more fragments
+		nbIP_Flags = 0b00100000;
+	else
+		return FALSE; // IP数据包Flags只有三种情况，其他情况不做处理
+
+	UINT32 nbIP_FragmentOffset = ipHeaderInfo->FragmentOffset;// 正常来说，只需要叠加一下OFFSET就可以，该变量可能用不到
+
+	// SELF_MTU相关参数
+	UINT32 SELF_MTUpayloadLen = (SELF_MTU - ipHeaderInfo->HeaderLength) & 0xFFF8;	// 单个IP数据包，除去IP首部后的payload长度.因为分片的字节偏移必须是8的整数倍
+	UINT32 SELF_MTUDataLen = SELF_MTUpayloadLen + ipHeaderInfo->HeaderLength;		// 单个IP数据包，包括IP首部的总长度
+	UINT32 SELF_MTUandMACSize = SELF_MTUDataLen + 14;								// 单个IP数据包，包括IP首部和MAC帧头的长度
+	UINT32 SELF_MDLDataSize = SELF_MTUandMACSize + 0x20;							// 单个MDL的最小容量（留有0x20的冗余）
+	UINT32 SELF_nbDataLength = SELF_MDLDataSize;									// 单个NET_BUFFER的datalength
+	UINT32 SELF_MACHandIPHLen = 14 + ipHeaderInfo->HeaderLength;
+
+	// MaxFragmentNum：分片数量
+	UINT32 totalPayloadLength = ipHeaderInfo->TotalLength - ipHeaderInfo->HeaderLength;
+	MaxFragmentNum = (totalPayloadLength % SELF_MTUpayloadLen) > 0 ? (totalPayloadLength / SELF_MTUpayloadLen + 1) : totalPayloadLength / SELF_MTUpayloadLen;
+	
+	// remainDataLen：当前NB中还需要拷贝的payload长度
+	remainDataLen = ipHeaderInfo->TotalLength - ipHeaderInfo->HeaderLength;
+
+	for (UINT i = 0; i < MaxFragmentNum; i++)
+	{
+		if (i == 0)
+		{
+			PMDL pmdl = ExAllocatePoolWithTag(NonPagedPool, sizeof(PMDL), CLONE_DATA_POOL_TAG);
+			if (!pmdl)
+				return FALSE;
+			DataPoolforMdl = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, SELF_MDLDataSize, CLONE_DATA_POOL_TAG);	//分配一个足够的空间
+			if (!DataPoolforMdl)
+				return FALSE;
+			RtlZeroMemory(DataPoolforMdl, SELF_MDLDataSize);
+			pmdl = IoAllocateMdl(DataPoolforMdl, SELF_MDLDataSize, FALSE, FALSE, NULL);
+			MmBuildMdlForNonPagedPool(pmdl);
+
+			//构造NBL
+			status = FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, pmdl, 0, SELF_MDLDataSize, pCopyLayerdata);
+			if (!NT_SUCCESS(status))
+				return FALSE;
+
+			PNET_BUFFER tmpnb = NET_BUFFER_LIST_FIRST_NB(*pCopyLayerdata);	//取第一个NB
+
+			bytestocopy = SELF_MTUandMACSize;	// 需要copy MAC头部、IP头部、能整除8的payload长
+			DestionationOffset = 0;				// DestionationOffset=0,SourceOffset=0
+			SourceOffset = 0;
+			NdisCopyFromNetBufferToNetBuffer(tmpnb, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+			if (bytescopied != bytestocopy)
+				return FALSE;
+
+			tmpnb->DataLength = SELF_MTUandMACSize;
+			tmpnb->CurrentMdl->ByteCount = tmpnb->DataLength + tmpnb->CurrentMdlOffset;
+			remainDataLen -= SELF_MTUpayloadLen;
+
+			// get ipH
+			PVOID tmpMdlStart = MmGetSystemAddressForMdlSafe(tmpnb->CurrentMdl, NormalPagePriority);
+			if (!tmpMdlStart)
+				return FALSE;
+			PUCHAR ipHeader = (PUCHAR)tmpMdlStart + tmpnb->CurrentMdlOffset + 14;
+
+			tmpFlags = 0b00100000;
+			updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, SELF_MTUDataLen, tmpFlags, nbIP_FragmentOffset);
+
+			//NdisAdvanceNetBufferDataStart(tmpnb, 14, FALSE, 0);
+
+			currentNBL = *pCopyLayerdata;
+
+		}else {
+			// 先构造mdl
+			// 因为AllocateSize忘记替换的问题，产生了部分bug
+			UINT AllocateSize = remainDataLen > SELF_MTU ? SELF_MDLDataSize : remainDataLen + 34 + 0x20;
+
+			PMDL pmdl = ExAllocatePoolWithTag(NonPagedPool, sizeof(PMDL), CLONE_DATA_POOL_TAG);
+			if (!pmdl)
+				return FALSE;
+			DataPoolforMdl = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, AllocateSize, CLONE_DATA_POOL_TAG);	//分配一个适当的空间
+			if (!DataPoolforMdl)
+				return FALSE;
+			RtlZeroMemory(DataPoolforMdl, AllocateSize);
+			pmdl = IoAllocateMdl(DataPoolforMdl, AllocateSize, FALSE, FALSE, NULL);
+			MmBuildMdlForNonPagedPool(pmdl);
+
+			PNET_BUFFER_LIST tmpNBL = (PNET_BUFFER_LIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(NET_BUFFER_LIST), CLONE_DATA_POOL_TAG);
+			RtlZeroMemory(tmpNBL, sizeof(NET_BUFFER_LIST));
+
+			status = FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, pmdl, 0, AllocateSize, &tmpNBL);
+			if (!NT_SUCCESS(status))
+				return FALSE;
+
+			PNET_BUFFER tmpnb = NET_BUFFER_LIST_FIRST_NB(tmpNBL);
+
+			// 先把MAC首部和IP首部复制到对应位置
+			bytestocopy = SELF_MACHandIPHLen;		// 需要复制首部需要14+iphlen字节
+			DestionationOffset = 0;					// currentoffset象征性设置为2
+			SourceOffset = 0;						// 从nb的起始位置开始复制
+			NdisCopyFromNetBufferToNetBuffer(tmpnb, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+			if (bytescopied != bytestocopy)			// 判断复制是否成功
+				return FALSE;
+
+			// 复制完首部后，开始复制此分片的data
+			bytestocopy = remainDataLen > SELF_MTUpayloadLen ? SELF_MTUpayloadLen : remainDataLen;
+			DestionationOffset = SELF_MACHandIPHLen;					// des：跳过目的NB的TCP和IP首部
+			SourceOffset = SELF_MACHandIPHLen + i * SELF_MTUpayloadLen;	// src：跳过源NB的首部和已经复制过的payload
+			NdisCopyFromNetBufferToNetBuffer(tmpnb, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+			if (bytescopied != bytestocopy)			// 判断复制是否成功
+				return FALSE;
+
+			// 复制完成后设置nb的datalength和CurrentMdl->ByteCount
+			tmpnb->DataLength = SELF_MACHandIPHLen + bytestocopy;
+			tmpnb->CurrentMdl->ByteCount = tmpnb->DataLength + tmpnb->CurrentMdlOffset;
+			remainDataLen -= bytescopied;
+
+			// get iph
+			PVOID tmpMdlStart = MmGetSystemAddressForMdlSafe(tmpnb->CurrentMdl, NormalPagePriority);
+			if (!tmpMdlStart)
+				return FALSE;
+			PUCHAR ipHeader = (PUCHAR)tmpMdlStart + tmpnb->CurrentMdlOffset + 14;
+
+			ULONG tmpTotalLen = bytestocopy + ipHeaderInfo->HeaderLength;
+			FragmentOffset = nbIP_FragmentOffset + (i * SELF_MTUpayloadLen) / 8;
+			if (remainDataLen > 0)
+				tmpFlags = 0b00100000;	// 最后一片之前的flags必须是001
+			else
+				tmpFlags = nbIP_Flags;	// 最后一片的flags应该维持初始的flags(经过处理的flags)
+			updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, tmpTotalLen, tmpFlags, FragmentOffset);
+
+			// NdisAdvanceNetBufferDataStart(tmpnb, 14, FALSE, 0);
+
+			NET_BUFFER_LIST_NEXT_NBL(currentNBL) = tmpNBL;
+			currentNBL = NET_BUFFER_LIST_NEXT_NBL(currentNBL);
+
+		}
+	}
+
+		if (remainDataLen != 0) {
+		return FALSE;		// 如果remainDataLen不是0，说明处理失败
+	}
+	else {
+		return TRUE;
+	}
+
+}
