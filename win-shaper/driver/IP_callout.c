@@ -234,7 +234,7 @@ void updateTCPchecksum(PUCHAR pIPHeader, PUCHAR pTCPHeader, PUCHAR pPayload, UIN
 
 	UINT16* buf = ExAllocatePoolWithTag(NonPagedPool,12 + TCPHeaderLen + PayloadLen,TCPCALLOUT_POOL_TAG);
 	UCHAR* tempbuf = (UCHAR*)buf;
-	
+
 	tcp->checksum = 0;
 
 	/* 构造伪头部 */
@@ -432,3 +432,73 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // 经
 			remainDataLen -= bytescopied;
 		}
 	}
+
+
+
+	if (outbound) {
+		status = FwpsInjectNetworkSendAsync(
+			injection_handle,
+			NULL,
+			0,
+			pendedPacket->compartmentId,
+			CopyLayerdata,
+			IPInjectionComplete,
+			pendedPacket
+		);
+
+	}
+	else {
+		status = FwpsInjectNetworkReceiveAsync(
+			injection_handle,
+			NULL,
+			0,
+			pendedPacket->compartmentId,
+			pendedPacket->interfaceIndex,
+			pendedPacket->subInterfaceIndex,
+			CopyLayerdata,
+			IPInjectionComplete,
+			pendedPacket
+		);
+	}
+
+	if (!NT_SUCCESS(status))
+	{
+		goto EXIT;
+	}
+	else {
+		// 注入成功后要释放pendedPacket和ipHeaderInfo
+		return TRUE;
+	}
+
+EXIT:
+	if (pendedPacket != NULL) {
+		ExFreePoolWithTag(pendedPacket, TCPCALLOUT_POOL_TAG);
+		pendedPacket = NULL;
+	}
+		
+	// 如果注入失败（或者不需要注入），还需要判断并释放Copylayerdata
+	if (CopyLayerdata != NULL) {
+		IPfragementFree(CopyLayerdata);
+	}	
+
+	return FALSE;
+}
+
+
+NTSTATUS IPNotify(
+	_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
+	_In_ const GUID* filterKey,
+	_Inout_ const FWPS_FILTER* filter)
+{
+	UNREFERENCED_PARAMETER(notifyType);
+	UNREFERENCED_PARAMETER(filterKey);
+	UNREFERENCED_PARAMETER(filter);
+	
+	return STATUS_SUCCESS;
+}
+
+
+
+
+
+
