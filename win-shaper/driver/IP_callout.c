@@ -173,7 +173,7 @@ AllocateCloneNetBufferList(
 		clonedNetBufferList
 	);
 	if (bytesRetreated)
-		
+
 		NdisAdvanceNetBufferDataStart(NET_BUFFER_LIST_FIRST_NB(netBufferList), bytesRetreated, FALSE, NULL);
 
 	return status;
@@ -204,6 +204,60 @@ void IPInjectionComplete(_Inout_ void* context,
 	}
 }
 
+
+/* Checksum a block of data */
+UINT16 csum(UINT16* packet, int packlen) {
+
+	register UINT32 sum = 0;
+
+	while (packlen > 1) {
+		sum += *(packet++);
+		packlen -= 2;
+	}
+
+	if (packlen > 0)
+		sum += *(PUCHAR)packet;
+
+	/* TODO: this depends on byte order */
+
+	while (sum >> 16)
+
+		sum = (sum & 0xffff) + (sum >> 16);
+
+	return (UINT16)~sum;
+}
+
+
+void updateTCPchecksum(PUCHAR pIPHeader, PUCHAR pTCPHeader, PUCHAR pPayload, UINT TCPHeaderLen, UINT PayloadLen)
+{
+	TCP_HEADER* tcp = (TCP_HEADER*)pTCPHeader;
+
+	UINT16* buf = ExAllocatePoolWithTag(NonPagedPool,12 + TCPHeaderLen + PayloadLen,TCPCALLOUT_POOL_TAG);
+	UCHAR* tempbuf = (UCHAR*)buf;
+	
+	tcp->checksum = 0;
+
+	/* 构造伪头部 */
+
+	memcpy(tempbuf, pIPHeader + 12, 4);
+	memcpy(tempbuf+4, pIPHeader + 16, 4);
+
+	tempbuf[8] = 0;
+	tempbuf[9] = 0x06;
+
+
+	UINT16 tmpLen = TCPHeaderLen + PayloadLen;
+	tempbuf[10] = (UINT16)(tmpLen & 0xFF00) >> 8;
+	tempbuf[11] = (UINT16)(tmpLen & 0x00FF);
+
+	/* Copy the TCP header and data */
+	memcpy(tempbuf + 12, pTCPHeader, TCPHeaderLen + PayloadLen);
+
+	/* CheckSum it */
+	tcp->checksum = csum(buf, 12 + TCPHeaderLen + PayloadLen);
+
+	ExFreePoolWithTag(buf,TCPCALLOUT_POOL_TAG);
+}
 
 
 
