@@ -148,3 +148,62 @@ AllocateAndInitializePendedPacket(
 
 
 
+NTSTATUS
+AllocateCloneNetBufferList(
+	_Inout_ NET_BUFFER_LIST* netBufferList,
+	_In_ UINT32 bytesRetreated,
+	_Outptr_ NET_BUFFER_LIST** clonedNetBufferList
+)
+{
+
+	NTSTATUS status = STATUS_SUCCESS;
+	//
+	// Note that the clone will inherit the original net buffer list's offset.
+	//
+
+	if (bytesRetreated)
+
+		NdisRetreatNetBufferDataStart(NET_BUFFER_LIST_FIRST_NB(netBufferList), bytesRetreated, 0, NULL);
+
+	status = FwpsAllocateCloneNetBufferList(
+		netBufferList,
+		NULL,
+		NULL,
+		0,
+		clonedNetBufferList
+	);
+	if (bytesRetreated)
+		
+		NdisAdvanceNetBufferDataStart(NET_BUFFER_LIST_FIRST_NB(netBufferList), bytesRetreated, FALSE, NULL);
+
+	return status;
+}
+
+//LOCAL function
+VOID IPfragementFree(PNET_BUFFER_LIST netBufferList)
+{
+	FwpsFreeNetBufferList(netBufferList);
+	netBufferList = NULL;
+}
+
+void IPInjectionComplete(_Inout_ void* context,
+	_Inout_ PNET_BUFFER_LIST netBufferList,
+	_In_ BOOLEAN dispatchLevel) 
+{
+	UNREFERENCED_PARAMETER(dispatchLevel);
+
+	if (!NT_SUCCESS(netBufferList->Status))
+	{
+		DbgPrint("! Packet injection failed: 0x%08X\n", netBufferList->Status);
+	}
+
+	IPfragementFree(netBufferList);
+	if (context != NULL) {
+		ExFreePoolWithTag((TL_INSPECT_PENDED_PACKET*)context, TCPCALLOUT_POOL_TAG);
+		context = NULL;
+	}
+}
+
+
+
+
