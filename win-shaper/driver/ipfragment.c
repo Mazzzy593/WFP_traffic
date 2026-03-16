@@ -649,5 +649,64 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 						UCHAR tmpFlags = 0b00100000;
 						updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, SELF_MTUDataLen, tmpFlags, nbIP_FragmentOffset);
 					}
+					else {
+						// 先把MAC首部和IP首部复制到对应位置
+						bytestocopy = SELF_MACHandIPHLen;		// 需要复制首部需要14+iphlen字节
+						DestionationOffset = 0;					// currentoffset象征性设置为2
+						SourceOffset = 0;						// 从nb的起始位置开始复制
+						NdisCopyFromNetBufferToNetBuffer(newNB, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+						if (bytescopied != bytestocopy)			// 判断复制是否成功
+							return FALSE;
 
-					
+						// 复制完首部后，开始复制此分片的data
+						bytestocopy = remainDataLen > SELF_MTUpayloadLen ? SELF_MTUpayloadLen : remainDataLen;
+						DestionationOffset = SELF_MACHandIPHLen;					// des：跳过目的NB的TCP和IP首部
+						SourceOffset = SELF_MACHandIPHLen + i * SELF_MTUpayloadLen;	// src：跳过源NB的首部和已经复制过的payload
+						NdisCopyFromNetBufferToNetBuffer(newNB, DestionationOffset, bytestocopy, nb, SourceOffset, &bytescopied);
+						if (bytescopied != bytestocopy)			// 判断复制是否成功
+							return FALSE;
+
+						// 复制完成后设置nb的datalength和CurrentMdl->ByteCount
+						newNB->DataLength = SELF_MACHandIPHLen + bytestocopy;
+						newNB->CurrentMdl->ByteCount = newNB->DataLength + newNB->CurrentMdlOffset;
+						// 后续分片携带的数据长度可能是SELF_MTUpayloadLen，也可能是剩余的不足SELF_MTUpayloadLen的数据
+						remainDataLen -= bytescopied;			
+
+						// get iph
+						PVOID tmpMdlStart = MmGetSystemAddressForMdlSafe(newNB->CurrentMdl, NormalPagePriority);
+						if (!tmpMdlStart)
+							return FALSE;
+						PUCHAR ipHeader = (PUCHAR)tmpMdlStart + newNB->CurrentMdlOffset + 14;
+
+						// update iph
+						ULONG tmpTotalLen = bytestocopy + ipHeaderInfo->HeaderLength;
+						FragmentOffset = nbIP_FragmentOffset + (i * SELF_MTUpayloadLen) / 8;
+						if (remainDataLen > 0)
+							tmpFlags = 0b00100000;	// 最后一片之前的flags必须是001
+						else 
+							tmpFlags = nbIP_Flags;	// 最后一片的flags应该维持初始的flags
+
+						updateIPHeader(ipHeader, ipHeaderInfo->HeaderLength, tmpTotalLen, tmpFlags, FragmentOffset);
+					}
+
+					NET_BUFFER_NEXT_NB(currentNB) = newNB;
+					currentNB = NET_BUFFER_NEXT_NB(currentNB);
+				}
+
+				nb = NET_BUFFER_NEXT_NB(nb);
+				continue;
+			}
+			
+		}
+
+		if (remainDataLen != 0)	// 最后做一个简单判断，如果合理就return TRUE
+			return FALSE;
+		else
+			return TRUE;
+	}
+	///////////////// 后续NB的处理 -end/////////////////////////////////////////////////////////////////////////////////////////////////
+}
+
+
+
+
