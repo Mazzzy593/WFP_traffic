@@ -13,6 +13,16 @@ static HANDLE OpenDriver() {
   return CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
 }
 
+static BOOL IsSystem64Bit() {
+#ifdef _WIN64
+  return TRUE;
+#else
+  BOOL is64bit = FALSE;
+  IsWow64Process(GetCurrentProcess(), &is64bit);
+  return is64bit;
+#endif
+}
+
 bool Start() {
   bool ok = false;
   SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
