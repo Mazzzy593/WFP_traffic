@@ -32,8 +32,10 @@ void CustomProfiles::Save() {
   int count = (int)profiles_.GetCount();
   for (int i = 0; i < count; i++) {
     CString profile = profiles_[i].Serialize();
-    if (!profile.IsEmpty())
-      out += profile + L"\n";
+    if (!profile.IsEmpty()) {
+      out.Append(profile);
+      out.Append(L"\n");
+    }
   }
   HANDLE hFile = CreateFile(data_file_, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
   if (hFile != INVALID_HANDLE_VALUE) {
