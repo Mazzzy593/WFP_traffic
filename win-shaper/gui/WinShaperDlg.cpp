@@ -261,3 +261,69 @@ void CWinShaperDlg::LoadProfiles() {
   connection_profiles_.Add(ConnectionProfile(L"Mobile 2G", 280000, 256000, 800, 0, 150000, 150000));
   connection_profiles_.Add(ConnectionProfile(L"Mobile EDGE", 240000, 200000, 840, 0, 150000, 150000));
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::Enable() {
+  int stock_count = (int)connection_profiles_.GetCount();
+  int custom_count = (int)custom_.profiles_.GetCount();
+  int index = m_profileList.GetCurSel();
+  if (index >= 0 && index < stock_count + custom_count) {
+    if (Install()) {
+      if (Start()) {
+        if (driver_interface_ == INVALID_HANDLE_VALUE)
+          driver_interface_ = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        if (driver_interface_ != INVALID_HANDLE_VALUE) {
+          ConnectionProfile profile;
+          if (index < stock_count)
+            profile = connection_profiles_[index];
+          else
+            profile = custom_.profiles_[index - stock_count];
+          DWORD bytesReturned = 0;
+          SHAPER_PARAMS settings;
+          settings.plr = profile.plr_;
+          settings.inBps = profile.inBps_;
+          settings.outBps = profile.outBps_;
+          settings.inLatency = profile.rtt_ / 2;
+          settings.outLatency = settings.inLatency;
+          if (profile.rtt_ % 2)
+            settings.inLatency++;
+          settings.inBufferBytes = profile.inBufferLen_;
+          settings.outBufferBytes = profile.outBufferLen_;
+          if (DeviceIoControl(driver_interface_, SHAPER_IOCTL_ENABLE, &settings, sizeof(settings), NULL, 0, &bytesReturned, NULL)) {
+            SetTimer(1, 500, NULL);
+            enabled_ = true;
+          } else {
+            Error(L"Failed to enable traffic-shaping\n");
+          }
+        } else {
+          Error(L"Failed to connect to the traffic-shaper driver\n");
+        }
+      }
+    }
+  }
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::Disable() {
+  KillTimer(1);
+  m_inboundQueue.SetPos(0);
+  m_outboundQueue.SetPos(0);
+  if (driver_interface_ != INVALID_HANDLE_VALUE) {
+    DWORD bytesReturned = 0;
+    if (DeviceIoControl(driver_interface_, SHAPER_IOCTL_DISABLE, NULL, 0, NULL, 0, &bytesReturned, NULL))
+      enabled_ = false;
+    CloseHandle(driver_interface_);
+    driver_interface_ = INVALID_HANDLE_VALUE;
+  } else {
+    enabled_ = false;
+  }
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::OnClose() {
+  Uninstall();
+  CDialogEx::OnOK();
+}
