@@ -128,7 +128,7 @@ BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyL
 	if (random > SELF_IPFragmentRate)
 		return FALSE;
 
-	UINT SELF_MTU = SELF_MTUmin + RtlRandomEx(&now.LowPart) % (SELF_MTUmax - SELF_MTUmin);	// �����MTU
+	UINT SELF_MTU = SELF_MTUmin + RtlRandomEx(&now.LowPart) % ((SELF_MTUmax - SELF_MTUmin) > 0 ? (SELF_MTUmax - SELF_MTUmin) : 1);	// �����MTU
 
 	NTSTATUS status;
 	PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB((PNET_BUFFER_LIST)layerData);// inbound һ��NBLֻ��һ��NB
