@@ -178,3 +178,86 @@ void CWinShaperDlg::OnOK()
 void CWinShaperDlg::OnCancel()
 {
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::OnCbnSelchangeConnectionProfiles() {
+  int total = (int)(connection_profiles_.GetCount() + custom_.profiles_.GetCount());
+  int selected = m_profileList.GetCurSel();
+  if (selected >= total) {
+    CustomProfilesDlg dlg;
+    dlg.DoModal();
+    PopulateConnectionList();
+  }
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::OnBnClickedEnable() {
+  if (enabled_)
+    Disable();
+  else
+    Enable();
+  if (enabled_) {
+    m_btnEnable.SetWindowTextW(L"&Disable");
+    m_profileList.EnableWindow(FALSE);
+    m_inboundQueue.EnableWindow(TRUE);
+    m_inboundQueue.SetState(PBST_PAUSED);
+    m_outboundQueue.EnableWindow(TRUE);
+    m_outboundQueue.SetState(PBST_PAUSED);
+    UpdateStatus();
+  } else {
+    m_btnEnable.SetWindowTextW(L"&Enable");
+    m_profileList.EnableWindow(TRUE);
+    m_inboundQueue.SetPos(0);
+    m_inboundQueue.EnableWindow(FALSE);
+    m_outboundQueue.SetPos(0);
+    m_outboundQueue.EnableWindow(FALSE);
+  }
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::PopulateConnectionList() {
+  int selected = m_profileList.GetCurSel();
+  if (selected == CB_ERR)
+    selected = 0;
+
+  LoadProfiles();
+  int total = 0;
+  m_profileList.SetRedraw(FALSE);
+  m_profileList.ResetContent();
+  int count = (int)connection_profiles_.GetCount();
+  for (int i = 0; i < count; i++) {
+    m_profileList.InsertString(total, connection_profiles_[i].DisplayString());
+    total++;
+  }
+  custom_.Load();
+  count = (int)custom_.profiles_.GetCount();
+  for (int i = 0; i < count; i++) {
+    m_profileList.InsertString(total, custom_.profiles_[i].DisplayString());
+    total++;
+  }
+  m_profileList.InsertString(total, L"Edit...");
+  m_profileList.SetRedraw(TRUE);
+
+  if (selected >= total - 1)
+    selected = 0;
+  m_profileList.SetCurSel(selected);
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::LoadProfiles() {
+  connection_profiles_.RemoveAll();
+  connection_profiles_.Add(ConnectionProfile(L"Cable", 5000000, 1000000, 28, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"DSL",   1500000, 384000,  50, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"FIOS",  20000000, 5000000, 4, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"56K Dial-Up",  49000, 30000, 120, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile LTE", 12000000, 12000000, 70, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile 3G - Typical", 1600000, 768000, 300, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile 3G - Fast", 1600000, 768000, 150, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile 3G - Slow", 780000, 330000, 200, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile 2G", 280000, 256000, 800, 0, 150000, 150000));
+  connection_profiles_.Add(ConnectionProfile(L"Mobile EDGE", 240000, 200000, 840, 0, 150000, 150000));
+}
