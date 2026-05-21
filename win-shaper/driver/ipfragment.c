@@ -152,6 +152,9 @@ BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyL
 	ULONG SourceOffset = 0;
 
 	PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(nb), NormalPagePriority);
+	if (currentMdlStart == NULL)
+		return FALSE;
+
 	PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
 
 	// ɸѡ��Ҫ����Ƭ��NB������Ҫ��Ƭ��ֱ��return False
