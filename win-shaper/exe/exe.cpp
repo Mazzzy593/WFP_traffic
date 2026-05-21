@@ -26,6 +26,18 @@ static BOOL IsSystem64Bit() {
 #endif
 }
 
+static SHAPER_PARAMS DefaultSettings() {
+  SHAPER_PARAMS settings;
+  settings.plr = 0;
+  settings.inBps = 0;
+  settings.outBps = 0;
+  settings.inLatency = 0;
+  settings.outLatency = 0;
+  settings.inBufferBytes = 150000;
+  settings.outBufferBytes = 150000;
+  return settings;
+}
+
 bool Start() {
   bool ok = false;
   SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
