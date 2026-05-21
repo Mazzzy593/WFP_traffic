@@ -253,11 +253,10 @@ BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyL
 			}
 			MmBuildMdlForNonPagedPool(pmdl);
 
-			PNET_BUFFER_LIST tmpNBL = (PNET_BUFFER_LIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(NET_BUFFER_LIST), CLONE_DATA_POOL_TAG);
-			RtlZeroMemory(tmpNBL, sizeof(NET_BUFFER_LIST));
+			PNET_BUFFER_LIST tmpNBL = NULL;
 
 			status = FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, pmdl, 0, AllocateSize, &tmpNBL);
-			if (!NT_SUCCESS(status))
+			if (!NT_SUCCESS(status) || tmpNBL == NULL)
 				return FALSE;
 
 			PNET_BUFFER tmpnb = NET_BUFFER_LIST_FIRST_NB(tmpNBL);
