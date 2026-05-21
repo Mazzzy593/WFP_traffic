@@ -414,10 +414,10 @@ CString CWinShaperDlg::ExtractDriver() {
     UINT resource_id = is64bit ? RC_SHAPER_64 : RC_SHAPER_32;
     HRSRC resource = FindResource(g_hInstance, MAKEINTRESOURCE(resource_id), RT_RCDATA);
     if (resource) {
-      HGLOBAL resource_handle = LoadResource(NULL, resource);
+      HGLOBAL resource_handle = LoadResource(g_hInstance, resource);
       if (resource_handle) {
         LPBYTE driver_bits = (LPBYTE)LockResource(resource_handle);
-        DWORD len = SizeofResource(NULL, resource);
+        DWORD len = SizeofResource(g_hInstance, resource);
         if (driver_bits && len) {
           HANDLE hFile = CreateFile(file, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
           if (hFile != INVALID_HANDLE_VALUE) {
