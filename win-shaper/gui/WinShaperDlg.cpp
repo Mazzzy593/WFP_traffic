@@ -426,6 +426,8 @@ CString CWinShaperDlg::ExtractDriver() {
               driver_file = file;
             }
             CloseHandle(hFile);
+            if (driver_file.IsEmpty())
+              DeleteFile(file);
           }
         }
       }
