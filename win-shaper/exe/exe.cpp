@@ -133,9 +133,9 @@ bool Stop(bool silent = false) {
             do {
               QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded);
               if (status.dwCurrentState == SERVICE_STOP_PENDING)
-                Sleep(100);
+                Sleep(SERVICE_WAIT_INTERVAL_MS);
               count++;
-            } while(status.dwCurrentState == SERVICE_STOP_PENDING && count < 600);
+            } while(status.dwCurrentState == SERVICE_STOP_PENDING && count < SERVICE_WAIT_ATTEMPTS);
             if (status.dwCurrentState == SERVICE_STOPPED) {
               ok = true;
             } else if (!silent) {
