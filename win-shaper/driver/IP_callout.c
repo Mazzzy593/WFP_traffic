@@ -352,7 +352,10 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // �
 	UINT32 currentSeqNum = pTCPHeader->sequenceNumber;
 	
 	//����һ����NBL������NB��NB�в�û��MDL
-	FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, NULL, 0, 0, &CopyLayerdata);
+	status = FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, NULL, 0, 0, &CopyLayerdata);
+	if (!NT_SUCCESS(status) || CopyLayerdata == NULL)
+		goto EXIT;
+
 	currentNB = NET_BUFFER_LIST_FIRST_NB(CopyLayerdata);
 	
 	
