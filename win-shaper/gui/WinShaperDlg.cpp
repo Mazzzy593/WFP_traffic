@@ -402,7 +402,7 @@ CString CWinShaperDlg::ExtractDriver() {
   if (SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &path) == S_OK) {
     CString file(path);
     CoTaskMemFree(path);
-    file += "\winShaper.sys";
+    file += "\\winShaper.sys";
     DeleteFile(file);
 
     BOOL is64bit = FALSE;
