@@ -165,3 +165,64 @@ bool Remove(bool silent = false) {
   }
   return ok;
 }
+
+
+bool Set(SHAPER_PARAMS &settings) {
+  bool ok = false;
+  HANDLE shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+  if (shaper == INVALID_HANDLE_VALUE) {
+    Start();
+    shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+  }
+  if (shaper != INVALID_HANDLE_VALUE) {
+    DWORD bytesReturned = 0;
+    if (DeviceIoControl(shaper, SHAPER_IOCTL_ENABLE, &settings, sizeof(settings), NULL, 0, &bytesReturned, NULL)) {
+      ok = true;
+    } else {
+      printf("SHAPER_IOCTL_ENABLE failed: 0x%08X\n", GetLastError());
+    }
+    CloseHandle(shaper);
+  } else {
+    printf("Failed to open Traffic Shaper driver\n");
+  }
+  return ok;
+}
+
+bool Reset() {
+  bool ok = false;
+  HANDLE shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+  if (shaper != INVALID_HANDLE_VALUE) {
+    DWORD bytesReturned = 0;
+    if (DeviceIoControl(shaper, SHAPER_IOCTL_DISABLE, NULL, 0, NULL, 0, &bytesReturned, NULL))
+      ok = true;
+    else
+      printf("SHAPER_IOCTL_DISABLE failed: 0x%08X\n", GetLastError());
+    CloseHandle(shaper);
+  } else {
+    printf("Failed to open Traffic Shaper driver\n");
+  }
+  return ok;
+}
+
+void usage() {
+  printf("Usage: shaper [install|remove|set|reset] <options>\n"
+         "\n"
+         "  install: Installs the shaper driver and starts the service.\n"
+         "  remove: Stops the service and uninstalls the driver.\n"
+         "  set: Enable traffic-shaping with the supplied configuration (see set options below).\n"
+         "  reset: Disable traffic-shaping.\n"
+         "\n"
+         " Options for set command (specified as option=value):\n"
+         "  inbps: Inbound bandwidth in bits-per-second.\n"
+         "  outbps: Outbound bandwidth in bits-per-second.\n"
+         "  rtt: Connection latency in milliseconds (half applied inbound and half applied outbound).\n"
+         "  plr: Random packet loss in percent (accurate to 0.01 percent, defaults to 0)"
+         "  inbuff: Inbound buffer size in bytes (defaults to 150,000)\n"
+         "  outbuff: Outbound buffer size in bytes (defaults to 150,000)\n"
+         "\n"
+         " Examples:\n"
+         "  shaper install\n"
+         "  shaper set inbps=5000000 outbps=1000000 rtt=28\n"
+         "  shaper reset\n"
+         "  shaper remove\n");
+}
