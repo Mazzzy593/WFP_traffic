@@ -227,6 +227,111 @@ NTSTATUS RegisterCallout(
     return status;
 }
 
+NTSTATUS RegisterIPCallout(
+    _In_ const GUID* layerKey,
+    _In_ const GUID* calloutKey,
+    _Inout_ void* deviceObject,
+    _Out_ UINT32* calloutId,
+    _In_ BOOLEAN is_outbound) {
+    NTSTATUS status = STATUS_SUCCESS;
+
+    FWPS_CALLOUT sCallout = { 0 };
+    FWPM_CALLOUT mCallout = { 0 };
+
+    FWPM_DISPLAY_DATA displayData = { 0 };
+
+    sCallout.calloutKey = *calloutKey;
+    sCallout.classifyFn = IPClassify;
+    sCallout.notifyFn = IPNotify;
+
+    status = FwpsCalloutRegister(deviceObject, &sCallout, calloutId);
+    if (NT_SUCCESS(status)) {
+        displayData.name = is_outbound ? L"Shaper Outbound Callout" : L"Shaper Inbound Callout";
+        displayData.description = is_outbound ? L"Traffic-shape outbound traffic" : L"Traffic-shape inbound traffic";
+
+        mCallout.calloutKey = *calloutKey;
+        mCallout.displayData = displayData;
+        mCallout.applicableLayer = *layerKey;
+
+        status = FwpmCalloutAdd(engine_handle, &mCallout, NULL, NULL);
+        if (NT_SUCCESS(status)) {
+            status = AddFilter(
+                is_outbound ? L"Traffic Shaper Filter (Outbound)" : L"Traffic Shaper Filter (Inbound)",
+                is_outbound ? L"Traffic-shape outbound traffic" : L"Traffic-shape inbound traffic",
+                0, layerKey, calloutKey);
+        }   
+        if (!NT_SUCCESS(status)) {
+            FwpsCalloutUnregisterById(*calloutId);
+            *calloutId = 0;
+        }
+    }
+
+    return status;
+}
+
+/*-----------------------------------------------------------------------------
+  Register the callouts and filters for intercepting MAC layer traffic
+-----------------------------------------------------------------------------*/
+NTSTATUS RegisterCallouts(_Inout_ void* deviceObject) {
+    NTSTATUS status = STATUS_SUCCESS;
+    FWPM_SUBLAYER shaper_sublayer;
+
+    FWPM_SESSION session = { 0 };
+    session.flags = FWPM_SESSION_FLAG_DYNAMIC;
+
+    status = FwpmEngineOpen(NULL, RPC_C_AUTHN_WINNT, NULL, &session, &engine_handle);
+    if (NT_SUCCESS(status)) {
+        status = FwpmTransactionBegin(engine_handle, 0);
+        if (NT_SUCCESS(status)) {
+            RtlZeroMemory(&shaper_sublayer, sizeof(FWPM_SUBLAYER));
+            shaper_sublayer.subLayerKey = SHAPER_SUBLAYER;
+            shaper_sublayer.displayData.name = L"Traffic Shaper Sub-Layer";
+            shaper_sublayer.displayData.description = L"Sub-Layer for use by Traffic Shaper callouts";
+            shaper_sublayer.flags = 0;
+            shaper_sublayer.weight = 0;
+          
+            status = FwpmSubLayerAdd(engine_handle, &shaper_sublayer, NULL);
+            if (NT_SUCCESS(status)) {
+                DbgPrint("into Outbound MAC");
+                status = RegisterCallout(&FWPM_LAYER_OUTBOUND_MAC_FRAME_ETHERNET,
+                                &SHAPER_OUTBOUND_CALLOUT, deviceObject, &outbound_callout_id, TRUE);
+                if (NT_SUCCESS(status)) {
+                    DbgPrint("into Inbound MAC");
+                    status = RegisterCallout(&FWPM_LAYER_INBOUND_MAC_FRAME_ETHERNET,
+                        &SHAPER_INBOUND_CALLOUT, deviceObject, &inbound_callout_id, FALSE);
+                    if (NT_SUCCESS(status)) {
+                        DbgPrint("into Outbound IPv4");
+                        status = RegisterIPCallout(&FWPM_LAYER_OUTBOUND_IPPACKET_V4,
+                            &SHAPER_IP_OUTBOUND_CALLOUT, deviceObject, &outbound_IP_callout_id, TRUE);
+                        if (NT_SUCCESS(status)) {
+                            DbgPrint("into Inbound IPv4");
+                            status = RegisterIPCallout(&FWPM_LAYER_INBOUND_IPPACKET_V4, 
+                                    &SHAPER_IP_INBOUND_CALLOUT, deviceObject, &inbound_IP_callout_id, FALSE);                          
+                            
+                            if (NT_SUCCESS(status)) {
+                                status = FwpmTransactionCommit(engine_handle);
+                            }
+                        }
+                    }
+                }
+            }
+            // Cleanup the failed transaction
+            if (!NT_SUCCESS(status)) {
+                FwpmTransactionAbort(engine_handle);
+                _Analysis_assume_lock_not_held_(engine_handle); // Potential leak if "FwpmTransactionAbort" fails
+            }
+        }
+
+        // Cleanup the engine handle if something went wrong
+        if (!NT_SUCCESS(status)) {
+            FwpmEngineClose(engine_handle);
+            engine_handle = NULL;
+        }
+    }
+
+    return status;
+}
+
 /*-----------------------------------------------------------------------------
 -----------------------------------------------------------------------------*/
 void Cleanup(void) {
