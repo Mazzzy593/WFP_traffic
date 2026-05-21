@@ -135,6 +135,8 @@ BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyL
 	// ����nb��ָ��λ�ã���Ϊ��ջ����������ָ��IPͷ�Ŀ�ʼ��
 	// ���ﱾ���ǵ�����datalength��currentmdloffset��return֮��Ҫ����advance����
 	status = NdisRetreatNetBufferDataStart(nb, 14, 0, 0);
+	if (!NT_SUCCESS(status))
+		return FALSE;
 
 	PNET_BUFFER_LIST currentNBL = NULL;
 	PIPV4_HEADER ipHeaderInfo = (PIPV4_HEADER)ExAllocatePoolWithTag(NonPagedPool, sizeof(IPV4_HEADER), CLONE_DATA_POOL_TAG);
