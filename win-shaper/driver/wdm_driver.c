@@ -405,9 +405,6 @@ VOID EvtDeviceIOCtl(_In_ WDFQUEUE Queue,
     _In_ size_t InputBufferLength,
     _In_ ULONG IoControlCode) {
     UNREFERENCED_PARAMETER(Queue);
-    UNREFERENCED_PARAMETER(Request);
-    UNREFERENCED_PARAMETER(OutputBufferLength);
-    UNREFERENCED_PARAMETER(InputBufferLength);
     NTSTATUS status = STATUS_SUCCESS;
     switch (IoControlCode) {
     case SHAPER_IOCTL_DISABLE: {
