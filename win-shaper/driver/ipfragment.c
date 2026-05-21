@@ -750,6 +750,11 @@ VOID zzpTypeOfNBLTest(_Inout_opt_ void* layerdata)
 		total_packet_count++;
 		current_packet_count++;
 		PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(buffer), NormalPagePriority);
+		if (currentMdlStart == NULL) {
+			buffer = NET_BUFFER_NEXT_NB(buffer);
+			continue;
+		}
+
 		PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(buffer);
 		
 		if (NetBufferData[12] == 0x08 && NetBufferData[13] == 0x00){
