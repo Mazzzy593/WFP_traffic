@@ -59,35 +59,39 @@ bool Install() {
     SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
     if (!service) {
       TCHAR driver_path[MAX_PATH];
-      GetModuleFileName(NULL, driver_path, MAX_PATH);
-    #ifdef _WIN64
-      BOOL is64bit = TRUE;
-    #else
-      BOOL is64bit = FALSE;
-      IsWow64Process(GetCurrentProcess(), &is64bit);
-    #endif
-      if (is64bit)
-        lstrcpy(PathFindFileName(driver_path), _T("shaper64.sys"));
-      else
-        lstrcpy(PathFindFileName(driver_path), _T("shaper32.sys"));
-      service = CreateService(scm,
-                              SHAPER_SERVICE_NAME,
-                              SHAPER_SERVICE_DISPLAY_NAME,
-                              SERVICE_ALL_ACCESS,
-                              SERVICE_KERNEL_DRIVER,
-                              SERVICE_DEMAND_START,
-                              SERVICE_ERROR_NORMAL,
-                              driver_path,
-                              NULL,
-                              NULL,
-                              NULL,
-                              NULL,
-                              NULL);
-      if (service) {
-        CloseServiceHandle(service);
-        ok = Start();
+      DWORD path_len = GetModuleFileName(NULL, driver_path, MAX_PATH);
+      if (path_len == 0 || path_len == MAX_PATH) {
+        printf("Failed to resolve the shaper executable path\n");
       } else {
-        printf("Failed to install shaper driver\n");
+    #ifdef _WIN64
+        BOOL is64bit = TRUE;
+    #else
+        BOOL is64bit = FALSE;
+        IsWow64Process(GetCurrentProcess(), &is64bit);
+    #endif
+        if (is64bit)
+          lstrcpy(PathFindFileName(driver_path), _T("shaper64.sys"));
+        else
+          lstrcpy(PathFindFileName(driver_path), _T("shaper32.sys"));
+        service = CreateService(scm,
+                                SHAPER_SERVICE_NAME,
+                                SHAPER_SERVICE_DISPLAY_NAME,
+                                SERVICE_ALL_ACCESS,
+                                SERVICE_KERNEL_DRIVER,
+                                SERVICE_DEMAND_START,
+                                SERVICE_ERROR_NORMAL,
+                                driver_path,
+                                NULL,
+                                NULL,
+                                NULL,
+                                NULL,
+                                NULL);
+        if (service) {
+          CloseServiceHandle(service);
+          ok = Start();
+        } else {
+          printf("Failed to install shaper driver\n");
+        }
       }
     } else {
       CloseServiceHandle(service);
