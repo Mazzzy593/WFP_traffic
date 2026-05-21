@@ -523,7 +523,7 @@ NTSTATUS ShaperInitDriverObjects(
             // Set up the interface for CreateFile/WriteFile from user mode
             status = WdfDeviceInitAssignName(pInit, &ntDeviceName);
             if (NT_SUCCESS(status))
-                WdfDeviceInitAssignSDDLString(pInit, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX);
+                status = WdfDeviceInitAssignSDDLString(pInit, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX);
             if (NT_SUCCESS(status))
                 status = WdfDeviceCreate(&pInit, WDF_NO_OBJECT_ATTRIBUTES, pDevice);
             if (NT_SUCCESS(status))
