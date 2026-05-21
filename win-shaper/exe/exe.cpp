@@ -41,9 +41,9 @@ bool Start() {
             do {
               QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded);
               if (status.dwCurrentState == SERVICE_START_PENDING)
-                Sleep(100);
+                Sleep(SERVICE_WAIT_INTERVAL_MS);
               count++;
-            } while(status.dwCurrentState == SERVICE_START_PENDING && count < 600);
+            } while(status.dwCurrentState == SERVICE_START_PENDING && count < SERVICE_WAIT_ATTEMPTS);
             if (status.dwCurrentState == SERVICE_RUNNING) {
               ok = true;
             } else {
