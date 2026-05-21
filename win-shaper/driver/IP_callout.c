@@ -53,12 +53,19 @@ void IPClassify(
 	if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) != 0) { 
 		NT_ASSERT(layerData != NULL);  
 		_Analysis_assume_(layerData != NULL);
+		if (layerData == NULL) {
+			classifyOut->actionType = FWP_ACTION_PERMIT;
+			return;
+		}
 
-		HANDLE injection_handle = NULL;
 		BOOLEAN is_outbound = (inFixedValues->layerId == FWPS_LAYER_OUTBOUND_IPPACKET_V4);
+		HANDLE injection_handle = is_outbound ? ipv4_injectionhandle_out : ipv4_injectionhandle_in;
 		BOOLEAN fragmented = FALSE;
 
-		injection_handle = ipv4_injectionhandle_out;
+		if (injection_handle == NULL) {
+			classifyOut->actionType = FWP_ACTION_PERMIT;
+			return;
+		}
 
 		// ����inbound�����������ܲ���Ҫ����Ƿ���ע��
 		FWPS_PACKET_INJECTION_STATE packet_state = FwpsQueryPacketInjectionState(injection_handle, layerData, NULL);
