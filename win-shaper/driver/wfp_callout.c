@@ -105,3 +105,93 @@ void ShaperClassify(
 
     return;
 }
+
+/*-----------------------------------------------------------------------------
+  Empty notification function (we don't need to do anything here)
+-----------------------------------------------------------------------------*/
+NTSTATUS ShaperNotify(
+    _In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
+    _In_ const GUID* filterKey,
+    _Inout_ const FWPS_FILTER* filter) {
+    UNREFERENCED_PARAMETER(notifyType);
+    UNREFERENCED_PARAMETER(filterKey);
+    UNREFERENCED_PARAMETER(filter);
+    return STATUS_SUCCESS;
+}
+
+
+
+
+
+
+
+
+VOID DbgprintIPV4_HEADER(IPV4_HEADER* ipHeader, BOOLEAN is_out)
+{
+    // 打印iph
+    DbgPrint("***********************************************************************");
+    DbgPrint("Ver:%02x Hlen:%02x TotalLen: %d(byte) Flags:%x FragOffset: %d(byte) Checksum: %04x Src: %d.%d.%d.%d Des: %d.%d.%d.%d \n",
+       ipHeader->Version, ipHeader->HeaderLength, ipHeader->TotalLength,
+       ipHeader->Flags, ipHeader->FragmentOffset * 8, ipHeader->Checksum,
+      (ipHeader->SrcAddress >> 24) & 0xFF, (ipHeader->SrcAddress >> 16) & 0xFF, (ipHeader->SrcAddress >> 8) & 0xFF, ipHeader->SrcAddress & 0xFF,
+      (ipHeader->DesAddress >> 24) & 0xFF, (ipHeader->DesAddress >> 16) & 0xFF, (ipHeader->DesAddress >> 8) & 0xFF, ipHeader->DesAddress & 0xFF);
+}
+
+
+VOID IPV4_HEADER_INIT(IPV4_HEADER* ipH, PUCHAR ipP)  // ip header ip Packet
+{
+    //ipH->Version = ipP[0] >> 4;           // IPv4 IP协议版本号为4，下一代IP协议版本号为6。
+    ipH->Version = 0x4;
+    ipH->HeaderLength = (ipP[0] & 0xF) * 4;   // 首部长度一般是 5*4 = 20字节
+    ipH->TypeOfService = ipP[1];
+    ipH->TotalLength = (USHORT)((ipP[2] << 8) | ipP[3]);
+    ipH->Identification = (USHORT)((ipP[4] << 8) | ipP[5]);
+    ipH->Flags = ipP[6] >> 5;
+    ipH->FragmentOffset = (USHORT)(((ipP[6] & 0x1F) << 8) | ipP[7]);
+    ipH->TimeToLive = ipP[8];
+    ipH->Protocol = ipP[9];
+    ipH->Checksum = (USHORT)((ipP[10] << 8) | ipP[11]);        // 不知道是不是按照大端储存的，应该是
+    ipH->SrcAddress = (ULONG)((ipP[12] << 24) | (ipP[13] << 16) | (ipP[14] << 8) | ipP[15]);
+    ipH->DesAddress = (ULONG)((ipP[16] << 24) | (ipP[17] << 16) | (ipP[18] << 8) | ipP[19]);
+}
+/*-----------------------------------------------------------------------------
+  IPv4 packet Test 打印IPv4的地址
+-----------------------------------------------------------------------------*/
+BOOLEAN IP_get(_Inout_opt_ void* layerData,BOOLEAN is_out)
+{
+    DbgPrint("%s", "into IP_get function");
+
+	NET_BUFFER_LIST* nbl = (NET_BUFFER_LIST*)layerData;
+
+    // 只读取了第一个buffer的信息
+	NET_BUFFER* nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+
+	// Get the current MDL and its starting position.
+    PMDL currentMdl = NET_BUFFER_CURRENT_MDL(nb);
+	ULONG currentMdlOffset = NET_BUFFER_CURRENT_MDL_OFFSET(nb);
+
+	// Calculate the length of the MAC frame.
+    ULONG macFrameLength = NET_BUFFER_DATA_LENGTH(nb);
+
+    
+	// Get a pointer to the start of the buffer.
+	PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(currentMdl, NormalPagePriority);
+    if (!currentMdlStart)
+        return FALSE;
+
+	// get the mac frame
+	PUCHAR macFrame = (PUCHAR)currentMdlStart + currentMdlOffset;
+
+    ULONG currentMdlDatasize = (currentMdl->ByteCount - currentMdlOffset)> macFrameLength ? macFrameLength: (currentMdl->ByteCount - currentMdlOffset);
+
+    PUCHAR ipHeaderStart = macFrame;
+    IPV4_HEADER* ipHeader = (IPV4_HEADER*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IPV4_HEADER), 0);
+
+    if (ipHeader) {
+        RtlZeroMemory(ipHeader, sizeof(IPV4_HEADER));
+        IPV4_HEADER_INIT(ipHeader, ipHeaderStart);
+        DbgprintIPV4_HEADER(ipHeader,is_out);  
+    }
+    DbgPrint("***************print over************");
+    return TRUE;
+}
