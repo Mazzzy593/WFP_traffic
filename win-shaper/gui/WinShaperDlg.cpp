@@ -286,7 +286,7 @@ void CWinShaperDlg::Enable() {
     if (Install()) {
       if (Start()) {
         if (driver_interface_ == INVALID_HANDLE_VALUE)
-          driver_interface_ = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+          driver_interface_ = OpenDriver();
         if (driver_interface_ != INVALID_HANDLE_VALUE) {
           ConnectionProfile profile;
           if (index < stock_count)
