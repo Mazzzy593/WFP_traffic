@@ -316,14 +316,25 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // �
 		inMetaValues,
 		layerData
 	);
+	if (pendedPacket == NULL)
+		goto EXIT;
 
 	// ����IP��TCP��ͷ
 	PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB((PNET_BUFFER_LIST)layerData);
+	if (nb == NULL)
+		goto EXIT;
+
 	PNET_BUFFER currentNB = NULL;	// �����currentNB��ָ��ǰ��������NET_BUFFER_LIST�����һ��NET_BUFFER
 
 	PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(nb), NormalPagePriority);
+	if (currentMdlStart == NULL)
+		goto EXIT;
+
 	PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
 	ipHeaderInfo = (PIPV4_HEADER)ExAllocatePoolWithTag(NonPagedPool, sizeof(IPV4_HEADER), TCPCALLOUT_POOL_TAG);
+	if (ipHeaderInfo == NULL)
+		goto EXIT;
+
 	IPV4_HEADER_INIT(ipHeaderInfo, NetBufferData);		
 
 	// 1. �ж�Э������
