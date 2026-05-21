@@ -327,3 +327,69 @@ void CWinShaperDlg::OnClose() {
   Uninstall();
   CDialogEx::OnOK();
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+bool CWinShaperDlg::Install() {
+  bool installed = false;
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+  if (scm) {
+    SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+    if (!service) {
+      if (driver_path_.IsEmpty())
+        driver_path_ = ExtractDriver();
+      if (!driver_path_.IsEmpty()) {
+        service = CreateService(scm,
+                                SHAPER_SERVICE_NAME,
+                                SHAPER_SERVICE_DISPLAY_NAME,
+                                SERVICE_ALL_ACCESS,
+                                SERVICE_KERNEL_DRIVER,
+                                SERVICE_DEMAND_START,
+                                SERVICE_ERROR_NORMAL,
+                                driver_path_,
+                                NULL,
+                                NULL,
+                                NULL,
+                                NULL,
+                                NULL);
+        if (service) {
+          installed = true;
+          CloseServiceHandle(service);
+        } else {
+          Error(L"Failed to install traffic-shaper driver\n");
+        }
+      } else {
+        Error(L"Failed to extract the traffic-shaper driver\n");
+      }
+    } else {
+      installed = true;
+      CloseServiceHandle(service);
+    }
+    CloseServiceHandle(scm);
+  } else {
+    Error(L"Failed to open the Service Control Manager");
+  }
+  return installed;
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::Uninstall() {
+  Disable();
+  Stop();
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+  if (scm) {
+    SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+    if (service) {
+      if (!DeleteService(service))
+        Error(L"Failed to uninstall the driver");
+      CloseServiceHandle(service);
+    }
+    CloseServiceHandle(scm);
+  } else if (!driver_path_.IsEmpty()) {
+    Error(L"Failed to open the Service Control Manager to uninstall the driver");
+  }
+  if (!driver_path_.IsEmpty())
+    DeleteFile(driver_path_);
+  driver_path_.Empty();
+}
