@@ -107,3 +107,16 @@ public:
   unsigned __int64 inBufferLen_;
   unsigned __int64 outBufferLen_;
 };
+
+
+class CustomProfiles {
+public:
+  CustomProfiles();
+  ~CustomProfiles();
+  void Load();
+  void Save();
+  CArray<ConnectionProfile> profiles_;
+
+protected:
+  CString data_file_;
+};
