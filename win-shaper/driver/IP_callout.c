@@ -350,6 +350,9 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // ï¿
 	NdisAdvanceNetBufferDataStart(nb, IPHeaderLen, 0, 0);
 	PTCP_HEADER pTCPHeader = NdisGetDataBuffer(nb, sizeof(TCP_HEADER), NULL, 1, 0);
 	NdisRetreatNetBufferDataStart(nb, IPHeaderLen, 0, 0);
+	if (pTCPHeader == NULL)
+		goto EXIT;
+
 	UINT TCPHeaderLen = pTCPHeader->dORNS.dataOffset * 4;
 
 	///////////////////////////////////////////////////////////////////////////////////////////
