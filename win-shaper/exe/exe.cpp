@@ -60,8 +60,12 @@ bool Install() {
     if (!service) {
       TCHAR driver_path[MAX_PATH];
       GetModuleFileName(NULL, driver_path, MAX_PATH);
+    #ifdef _WIN64
+      BOOL is64bit = TRUE;
+    #else
       BOOL is64bit = FALSE;
       IsWow64Process(GetCurrentProcess(), &is64bit);
+    #endif
       if (is64bit)
         lstrcpy(PathFindFileName(driver_path), _T("shaper64.sys"));
       else
