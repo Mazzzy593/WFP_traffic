@@ -150,6 +150,83 @@ NTSTATUS WaitForWFP() {
     return status;
 }
 
+NTSTATUS AddFilter(
+    _In_ const wchar_t* filterName,
+    _In_ const wchar_t* filterDesc,
+    _In_ UINT64 context,
+    _In_ const GUID* layerKey,
+    _In_ const GUID* calloutKey) {
+    NTSTATUS status = STATUS_SUCCESS;
+
+    FWPM_FILTER filter = { 0 };
+    FWPM_FILTER_CONDITION filterConditions[3] = { 0 };
+    UINT conditionIndex;
+
+    filter.layerKey = *layerKey;
+    filter.displayData.name = (wchar_t*)filterName;
+    filter.displayData.description = (wchar_t*)filterDesc;
+
+    filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filter.action.calloutKey = *calloutKey;
+    filter.filterCondition = filterConditions;
+    filter.subLayerKey = SHAPER_SUBLAYER;
+    filter.weight.type = FWP_EMPTY; // auto-weight.
+    filter.rawContext = context;
+
+    conditionIndex = 0;
+
+    filter.numFilterConditions = conditionIndex;
+
+    status = FwpmFilterAdd(engine_handle, &filter, NULL, NULL);
+
+    return status;
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+NTSTATUS RegisterCallout(
+    _In_ const GUID* layerKey,
+    _In_ const GUID* calloutKey,
+    _Inout_ void* deviceObject,
+    _Out_ UINT32* calloutId,
+    _In_ BOOLEAN is_outbound) {
+    NTSTATUS status = STATUS_SUCCESS;
+
+    FWPS_CALLOUT sCallout = { 0 };
+    FWPM_CALLOUT mCallout = { 0 };
+
+    FWPM_DISPLAY_DATA displayData = { 0 };
+
+    sCallout.calloutKey = *calloutKey;
+    sCallout.classifyFn = ShaperClassify;
+    sCallout.notifyFn = ShaperNotify;
+
+    status = FwpsCalloutRegister(deviceObject, &sCallout, calloutId);
+    if (NT_SUCCESS(status)) {
+        displayData.name = is_outbound ? L"Shaper Outbound Callout" : L"Shaper Inbound Callout";
+        displayData.description = is_outbound ? L"Traffic-shape outbound traffic" : L"Traffic-shape inbound traffic";
+
+        mCallout.calloutKey = *calloutKey;
+        mCallout.displayData = displayData;
+        mCallout.applicableLayer = *layerKey;
+
+        status = FwpmCalloutAdd(engine_handle, &mCallout, NULL, NULL);
+        if (NT_SUCCESS(status)) {
+            status = AddFilter(
+                is_outbound ? L"Traffic Shaper Filter (Outbound)" : L"Traffic Shaper Filter (Inbound)",
+                is_outbound ? L"Traffic-shape outbound traffic" : L"Traffic-shape inbound traffic",
+                0, layerKey, calloutKey);
+        }
+
+        if (!NT_SUCCESS(status)) {
+            FwpsCalloutUnregisterById(*calloutId);
+            *calloutId = 0;
+        }
+    }
+
+    return status;
+}
+
 /*-----------------------------------------------------------------------------
 -----------------------------------------------------------------------------*/
 void Cleanup(void) {
