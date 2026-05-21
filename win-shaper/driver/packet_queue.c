@@ -25,7 +25,7 @@ BOOLEAN timer_pending = FALSE;
 // needed for out-of-band packet re-injection. This type
 // also points back to the flow context the packet belongs to.
 /*---------------------------------------------------------------------------
-    ????????????????????????????????????
+    
 --------------------------------------------------------------------------- */
 typedef struct {
    LIST_ENTRY     listEntry;
@@ -39,7 +39,7 @@ typedef struct {
    UINT16 layerId;
    IF_INDEX interfaceIndex;
    NDIS_PORT_NUMBER NdisPortNumber;
-   NET_BUFFER_LIST *netBufferList;  //?????Data
+   NET_BUFFER_LIST *netBufferList;  //Data
 } QUEUED_PACKET;
 
 // packet queues
@@ -50,24 +50,24 @@ typedef struct {
 // Only the bandwidth queue is affected by the queue buffer size.  The latency
 // queue has no limit.
 /*---------------------------------------------------------------------------
-* ??????????????bandwidth_queue???latency_queue???????
-* ?????bandwidth_queue???????????????bandwidth_queue???
-* latency_queue??????????????????????
-* ??bandwidth_queue?????????????????
+* bandwidth_queuelatency_queue
+* bandwidth_queuebandwidth_queue
+* latency_queue
+* bandwidth_queue
 --------------------------------------------------------------------------- */
 typedef struct {
   LIST_ENTRY bandwidth_queue; 
   LIST_ENTRY latency_queue;
 
-  unsigned short   plr;         // packet loss in 1/100% (0-10000) // ?????????1/100%?????????0?10000??
-  unsigned __int64 bps;         // bandwidth in bits per second    // ?????????????
-  unsigned long    latency;     // latency in microseconds         // ????????????
-  unsigned __int64 bufferBytes; // size of packet buffer in bytes  // ?????????????????
+  unsigned short   plr;         // packet loss in 1/100% (0-10000) // 1/100%0?10000
+  unsigned __int64 bps;         // bandwidth in bits per second    // 
+  unsigned long    latency;     // latency in microseconds         // 
+  unsigned __int64 bufferBytes; // size of packet buffer in bytes  // 
 
-  unsigned __int64 queued_bytes;    // accumulated size of queued packets ???????????????
-  unsigned __int64 available_bytes; // accumulated bytes available for sending ???????????????
-  LARGE_INTEGER last_tick;          // performance counter timestamp of the last time the queue was checked ??????????????
-  KSPIN_LOCK lock;               // ????????????
+  unsigned __int64 queued_bytes;    // accumulated size of queued packets 
+  unsigned __int64 available_bytes; // accumulated bytes available for sending 
+  LARGE_INTEGER last_tick;          // performance counter timestamp of the last time the queue was checked 
+  KSPIN_LOCK lock;               // 
 } PACKET_QUEUE;
 
 /*-----------------------------------------------------------------------------
@@ -113,25 +113,25 @@ NTSTATUS InitializePacketQueues(WDFDEVICE timer_parent) {
   InitializeListHead(&outbound_queue.bandwidth_queue);
   InitializeListHead(&outbound_queue.latency_queue);
 
-  // Create the timer that will be used to process the queues ????????????????????
+  // Create the timer that will be used to process the queues 
 
   WDF_TIMER_CONFIG timer_config;
   WDF_OBJECT_ATTRIBUTES timer_attributes;
-  WDF_TIMER_CONFIG_INIT(&timer_config, TimerEvt);   //?????TimerEvt
-  timer_config.Period = 0;          // Period?TolerableDelay??0???????????
+  WDF_TIMER_CONFIG_INIT(&timer_config, TimerEvt);   //TimerEvt
+  timer_config.Period = 0;          // Period?TolerableDelay0
   timer_config.TolerableDelay = 0;  //
-  timer_config.AutomaticSerialization = FALSE; //??????????
-  timer_config.UseHighResolutionTimer = WdfTrue;    //??????????
+  timer_config.AutomaticSerialization = FALSE; //
+  timer_config.UseHighResolutionTimer = WdfTrue;    //
   WDF_OBJECT_ATTRIBUTES_INIT(&timer_attributes);        
-  timer_attributes.ParentObject = timer_parent; // ??????timer_parent??????????
+  timer_attributes.ParentObject = timer_parent; // timer_parent
   timer_pending = FALSE;
-  status = WdfTimerCreate(&timer_config, &timer_attributes, &timer_handle); //??????????????timer_handle?
+  status = WdfTimerCreate(&timer_config, &timer_attributes, &timer_handle); //timer_handle?
 
   return status;
 }
 
 /*-----------------------------------------------------------------------------
-* ??????
+* 
 -----------------------------------------------------------------------------*/
 void FreeQueuedPacket(_Inout_ __drv_freesMem(Mem) QUEUED_PACKET* packet) {
   if (packet->netBufferList != NULL)
@@ -143,7 +143,7 @@ void FreeQueuedPacket(_Inout_ __drv_freesMem(Mem) QUEUED_PACKET* packet) {
 * 
 -----------------------------------------------------------------------------*/
 void DropQueue(PACKET_QUEUE *queue) {
-    // ????
+    // 
   KLOCK_QUEUE_HANDLE lock;
   KeAcquireInStackQueuedSpinLock(&queue->lock, &lock);
   while (!IsListEmpty(&queue->latency_queue)) {
@@ -156,27 +156,27 @@ void DropQueue(PACKET_QUEUE *queue) {
     QUEUED_PACKET *packet = CONTAINING_RECORD(listEntry, QUEUED_PACKET, listEntry);
     FreeQueuedPacket(packet);
   }
-  //???????
+  //
   KeReleaseInStackQueuedSpinLock(&lock);
 }
 
 /*-----------------------------------------------------------------------------
-* ???Enable?
+* Enable?
 -----------------------------------------------------------------------------*/
-BOOLEAN ShaperEnable(_In_ unsigned short plr,           // ????????
-                     _In_ unsigned __int64 inBps,       // ???????
+BOOLEAN ShaperEnable(_In_ unsigned short plr,           // 
+                     _In_ unsigned __int64 inBps,       // 
                      _In_ unsigned __int64 outBps,
                      _In_ unsigned long inLatency,
                      _In_ unsigned long outLatency,
                      _In_ unsigned __int64 inBufferBytes,
-                     _In_ unsigned __int64 outBufferBytes)  // ??????
+                     _In_ unsigned __int64 outBufferBytes)  // 
 {
   BOOLEAN ret = TRUE;
   KLOCK_QUEUE_HANDLE lock_handle;
 
   KeAcquireInStackQueuedSpinLock(&inbound_queue.lock, &lock_handle);
 
-  // ????
+  // 
   inbound_queue.plr = plr;
   inbound_queue.bps = inBps;
   inbound_queue.latency = inLatency;
@@ -184,7 +184,7 @@ BOOLEAN ShaperEnable(_In_ unsigned short plr,           // ????????
   inbound_queue.queued_bytes = 0;
   inbound_queue.available_bytes = INITIAL_TOKEN_COUNT;
   inbound_queue.last_tick = KeQueryPerformanceCounter(NULL);
-  // ???????in?out????????????????
+  // in?out
   KeReleaseInStackQueuedSpinLock(&lock_handle);
 
   KeAcquireInStackQueuedSpinLock(&outbound_queue.lock, &lock_handle);
@@ -194,23 +194,23 @@ BOOLEAN ShaperEnable(_In_ unsigned short plr,           // ????????
   outbound_queue.bufferBytes = outBufferBytes;
   outbound_queue.queued_bytes = 0;
   outbound_queue.available_bytes = INITIAL_TOKEN_COUNT;
-  outbound_queue.last_tick = inbound_queue.last_tick;   // ?????last_tick??
+  outbound_queue.last_tick = inbound_queue.last_tick;   // last_tick
   KeReleaseInStackQueuedSpinLock(&lock_handle);
 
   KeAcquireInStackQueuedSpinLock(&queue_lock, &lock_handle);
-  traffic_shaping_enabled = TRUE;       // ????????Driver??????????
+  traffic_shaping_enabled = TRUE;       // Driver
   KeReleaseInStackQueuedSpinLock(&lock_handle);
   return ret;
 }
 
 /*-----------------------------------------------------------------------------
-* ?gui??disable???????
+* ?guidisable
 -----------------------------------------------------------------------------*/
 BOOLEAN ShaperDisable() {
   BOOLEAN ret = TRUE;
   KLOCK_QUEUE_HANDLE lock_handle;
   KeAcquireInStackQueuedSpinLock(&queue_lock, &lock_handle);
-  traffic_shaping_enabled = FALSE;      // ??driver??????
+  traffic_shaping_enabled = FALSE;      // driver
   KeReleaseInStackQueuedSpinLock(&lock_handle);
   ProcessQueue(&outbound_queue);
   ProcessQueue(&inbound_queue);
@@ -288,47 +288,47 @@ void InjectPacket(QUEUED_PACKET *packet) {
 }
 
 /*-----------------------------------------------------------------------------
-  Inject any packets that are due (for now, all of them) ??????????????????????
-  ???? ??????????????
+  Inject any packets that are due (for now, all of them) 
+   
 -----------------------------------------------------------------------------*/
 void ProcessQueue(PACKET_QUEUE *queue) {
   QUEUED_PACKET* packet = NULL;
   KLOCK_QUEUE_HANDLE lock;
 
-  // process the bandwidth_queue    ?????????????
+  // process the bandwidth_queue    
 
   // Increment the available bytes if there is something in the queue 
-  // ?????????????????
+  // 
   KeAcquireInStackQueuedSpinLock(&queue->lock, &lock);
   LARGE_INTEGER frequency;
   LARGE_INTEGER now = KeQueryPerformanceCounter(&frequency);
-  // ??????now????????????????????last_tick?????????????????????????
-  // ?????????????latency_queue
+  // nowlast_tick
+  // latency_queue
   unsigned __int64 accumulated = ((now.QuadPart - queue->last_tick.QuadPart) * queue->bps) / (8 * frequency.QuadPart);
   queue->available_bytes += accumulated;
   if (IsListEmpty(&queue->bandwidth_queue) && queue->available_bytes > INITIAL_TOKEN_COUNT)
     queue->available_bytes = INITIAL_TOKEN_COUNT;
 
   // Move as many packets to the latency queue as the accumulated available bytes will allow
-  // ?????
+  // 
   do {
     packet = NULL;
     if (!IsListEmpty(&queue->bandwidth_queue)) { 
-      LIST_ENTRY * listEntry = RemoveHeadList(&queue->bandwidth_queue); // ?????????
+      LIST_ENTRY * listEntry = RemoveHeadList(&queue->bandwidth_queue); // 
 
-      // CONTAINING_RECORD ???????????QUEUED_PACKET??????????????“listEntry???????
-      // ???LIST_ENTRY?????????listEntry?QUEUED_PACKET?????LIST_ENTRY?????
+      // CONTAINING_RECORD QUEUED_PACKET“listEntry
+      // LIST_ENTRYlistEntry?QUEUED_PACKETLIST_ENTRY
       packet = CONTAINING_RECORD(listEntry, QUEUED_PACKET, listEntry);
 
-      // ??traffic_shaping_enabled?False ? ?????0 ? ?????????????available_bytes?????????latency_queue
+      // traffic_shaping_enabled?False ? 0 ? available_byteslatency_queue
       if (!traffic_shaping_enabled || queue->bps == 0 || packet->packet_length <= queue->available_bytes) {
 
-        queue->available_bytes -= packet->packet_length;    // available_bytes ??
-        queue->queued_bytes -= packet->packet_length;       // ????
+        queue->available_bytes -= packet->packet_length;    // available_bytes 
+        queue->queued_bytes -= packet->packet_length;       // 
 
-        // ?????????????latency_queue????????????????????????????
+        // latency_queue
         packet->latency_start = KeQueryPerformanceCounter(NULL);    
-        InsertTailList(&queue->latency_queue, &packet->listEntry);  // ???????listEntry???latency_queue?
+        InsertTailList(&queue->latency_queue, &packet->listEntry);  // listEntrylatency_queue?
       } else {
         InsertHeadList(&queue->bandwidth_queue, &packet->listEntry);
         packet = NULL;
@@ -459,7 +459,7 @@ BOOLEAN zzpMACFrameTest(_Inout_opt_ void* layerData,
 /*-----------------------------------------------------------------------------
   Decide if the packet should be queued and if so, place it in the appropriate
   queue and start the processing timer.
-  ?????Driver???????????????????????????????????
+  Driver
 -----------------------------------------------------------------------------*/
 BOOLEAN ShaperQueuePacket(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // ¾­¹ý°ü×°µÄÊý¾Ý°üµÄÏà¹ØÐÅÏ¢£¬ ÓÐlayer ID, source and destination addresses
     _In_ const FWPS_INCOMING_METADATA_VALUES* inMetaValues,   // ¾­¹ý°ü×°µÄÊý¾ÝÐÅÏ¢£¬interface index, timestamps
@@ -581,7 +581,7 @@ BOOLEAN ShaperQueuePacket(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // ¾
 
 
 /*-----------------------------------------------------------------------------
-*   ShaperGetStatus ????????
+*   ShaperGetStatus 
 -----------------------------------------------------------------------------*/
 void ShaperGetStatus(SHAPER_STATUS *status) {
   // Don't bother locking to read the values out
