@@ -68,6 +68,7 @@ void CustomProfiles::Load() {
           int pos = 0;
           CString line = in.Tokenize(L"\n", pos);
           while (line != L"") {
+            line.TrimRight(L"\r");
             ConnectionProfile profile(line);
             if (!profile.name_.IsEmpty())
               profiles_.Add(profile);
