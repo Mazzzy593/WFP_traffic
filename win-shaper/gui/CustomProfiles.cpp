@@ -32,14 +32,13 @@ void CustomProfiles::Save() {
     if (!profile.IsEmpty())
       out += profile + L"\n";
   }
-  if (out.GetLength()) {
-    HANDLE hFile = CreateFile(data_file_, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
-    if (hFile != INVALID_HANDLE_VALUE) {
-      DWORD written = 0;
-      DWORD len = out.GetLength() * sizeof(TCHAR);
+  HANDLE hFile = CreateFile(data_file_, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+  if (hFile != INVALID_HANDLE_VALUE) {
+    DWORD written = 0;
+    DWORD len = out.GetLength() * sizeof(TCHAR);
+    if (len > 0)
       WriteFile(hFile, (LPCTSTR)out, len, &written, 0);
-      CloseHandle(hFile);
-    }
+    CloseHandle(hFile);
   }
 }
 
