@@ -202,7 +202,7 @@ bool Set(SHAPER_PARAMS &settings) {
 
 bool Reset() {
   bool ok = false;
-  HANDLE shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+  HANDLE shaper = OpenDriver();
   if (shaper != INVALID_HANDLE_VALUE) {
     DWORD bytesReturned = 0;
     if (DeviceIoControl(shaper, SHAPER_IOCTL_DISABLE, NULL, 0, NULL, 0, &bytesReturned, NULL))
