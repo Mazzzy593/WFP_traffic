@@ -149,3 +149,67 @@ NTSTATUS WaitForWFP() {
 
     return status;
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void Cleanup(void) {
+    DestroyPacketQueues();
+
+    if (engine_handle) {
+        FwpmEngineClose(engine_handle);
+        engine_handle = NULL;
+    }
+    if (outbound_IP_callout_id) {
+        FwpsCalloutUnregisterById(outbound_IP_callout_id);
+        outbound_IP_callout_id = 0;
+    }
+    if (inbound_IP_callout_id) {
+        FwpsCalloutUnregisterById(inbound_IP_callout_id);
+        inbound_IP_callout_id = 0;
+    }
+    if (outbound_callout_id) {
+        FwpsCalloutUnregisterById(outbound_callout_id);
+        outbound_callout_id = 0;
+    }
+    if (inbound_callout_id) {
+        FwpsCalloutUnregisterById(inbound_callout_id);
+        inbound_callout_id = 0;
+    }
+    if (ih_out_ipv4) {
+        FwpsInjectionHandleDestroy(ih_out_ipv4);
+        ih_out_ipv4 = NULL;
+    }
+    if (ih_out_ipv6) {
+        FwpsInjectionHandleDestroy(ih_out_ipv6);
+        ih_out_ipv6 = NULL;
+    }
+    if (ih_out_unspecified) {
+        FwpsInjectionHandleDestroy(ih_out_unspecified);
+        ih_out_unspecified = NULL;
+    }
+    if (ih_in_ipv4) {
+        FwpsInjectionHandleDestroy(ih_in_ipv4);
+        ih_in_ipv4 = NULL;
+    }
+    if (ih_in_ipv6) {
+        FwpsInjectionHandleDestroy(ih_in_ipv6);
+        ih_in_ipv6 = NULL;
+    }
+    if (ih_in_unspecified) {
+        FwpsInjectionHandleDestroy(ih_in_unspecified);
+        ih_in_unspecified = NULL;
+    }
+}
+
+/*-----------------------------------------------------------------------------
+  Called when the driver is unloading
+-----------------------------------------------------------------------------*/
+_Function_class_(EVT_WDF_DRIVER_UNLOAD)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+void ShaperEvtDriverUnload(_In_ WDFDRIVER driverObject) {
+    UNREFERENCED_PARAMETER(driverObject);
+    driver_unloading = TRUE;
+
+    Cleanup();
+}
