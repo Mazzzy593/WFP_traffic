@@ -77,12 +77,7 @@ bool Install() {
       if (path_len == 0 || path_len == MAX_PATH) {
         printf("Failed to resolve the shaper executable path\n");
       } else {
-    #ifdef _WIN64
-        BOOL is64bit = TRUE;
-    #else
-        BOOL is64bit = FALSE;
-        IsWow64Process(GetCurrentProcess(), &is64bit);
-    #endif
+        BOOL is64bit = IsSystem64Bit();
         if (is64bit)
           lstrcpy(PathFindFileName(driver_path), _T("shaper64.sys"));
         else
