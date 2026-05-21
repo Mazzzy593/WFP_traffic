@@ -9,7 +9,7 @@ CustomProfiles::CustomProfiles() {
   if (SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &path) == S_OK) {
     CString dir(path);
     CoTaskMemFree(path);
-    dir += L"\winShaper";
+    dir += L"\\winShaper";
     CreateDirectory(dir, NULL);
     data_file_ = dir + L"profiles.txt";
   }
