@@ -494,10 +494,16 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // �
 	}
 	else {
 		// ע��ɹ���Ҫ�ͷ�pendedPacket��ipHeaderInfo
+		ExFreePoolWithTag(ipHeaderInfo, TCPCALLOUT_POOL_TAG);
 		return TRUE;
 	}
 
 EXIT:
+	if (ipHeaderInfo != NULL) {
+		ExFreePoolWithTag(ipHeaderInfo, TCPCALLOUT_POOL_TAG);
+		ipHeaderInfo = NULL;
+	}
+
 	if (pendedPacket != NULL) {
 		ExFreePoolWithTag(pendedPacket, TCPCALLOUT_POOL_TAG);
 		pendedPacket = NULL;
