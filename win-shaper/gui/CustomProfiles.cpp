@@ -55,7 +55,7 @@ void CustomProfiles::Load() {
       DWORD buff_len = len + sizeof(TCHAR);
       TCHAR * buff = (TCHAR *)malloc(buff_len);
       if (buff) {
-        memset(buff, buff_len, 0);
+        memset(buff, 0, buff_len);
         DWORD bytes_read;
         if (ReadFile(hFile, buff, len, &bytes_read, 0) && len == bytes_read) {
           CString in(buff);
