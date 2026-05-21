@@ -270,14 +270,7 @@ int main(int argc, char **argv) {
       ok = Remove();
     } else if (!lstrcmpiA(argv[1], "set")) {
       ok = true;
-      SHAPER_PARAMS settings;
-      settings.plr = 0;
-      settings.inBps = 0;
-      settings.outBps = 0;
-      settings.inLatency = 0;
-      settings.outLatency = 0;
-      settings.inBufferBytes = 150000;
-      settings.outBufferBytes = 150000;
+      SHAPER_PARAMS settings = DefaultSettings();
       for (int i = 2; i < argc; i++) {
         char * separator = strchr(argv[i], '=');
         if (separator) {
