@@ -226,3 +226,66 @@ void usage() {
          "  shaper reset\n"
          "  shaper remove\n");
 }
+
+int main(int argc, char **argv) {
+  bool ok = false;
+  if (argc > 1) {
+    DWORD bytesReturned = 0;
+    if (!lstrcmpiA(argv[1], "install")) {
+      Remove(true); // uninstall first in case an older version is registered
+      ok = Install();
+    } else if (!lstrcmpiA(argv[1], "remove")) {
+      ok = Remove();
+    } else if (!lstrcmpiA(argv[1], "set")) {
+      ok = true;
+      SHAPER_PARAMS settings;
+      settings.plr = 0;
+      settings.inBps = 0;
+      settings.outBps = 0;
+      settings.inLatency = 0;
+      settings.outLatency = 0;
+      settings.inBufferBytes = 150000;
+      settings.outBufferBytes = 150000;
+      for (int i = 2; i < argc; i++) {
+        char * separator = strchr(argv[i], '=');
+        if (separator) {
+          separator[0] = NULL;
+          const char * option = argv[i];
+          const char * value = &separator[1];
+          if (!strcmp(option, "inbps")) {
+            settings.inBps = _atoi64(value);
+          } else if (!strcmp(option, "outbps")) {
+            settings.outBps = _atoi64(value);
+          } else if (!strcmp(option, "rtt")) {
+            unsigned long rtt = atol(value);
+            settings.inLatency = rtt / 2;
+            settings.outLatency = rtt / 2;
+            if (rtt % 2)
+              settings.inLatency += 1;
+          } else if (!strcmp(option, "plr")) {
+            settings.plr = (unsigned short)(atof(value) * 100.0);
+          } else if (!strcmp(option, "inbuff")) {
+            settings.inBufferBytes = _atoi64(value);
+          } else if (!strcmp(option, "outbuff")) {
+            settings.outBufferBytes = _atoi64(value);
+          } else {
+            ok = false;
+            printf("Unrecognized option: %s\n", option);
+          }
+        } else {
+          ok = false;
+          printf("Incorrect option: %s\n", argv[i]);
+        }
+      }
+      if (ok) {
+        ok = Set(settings);
+      }
+    } else if (!lstrcmpiA(argv[1], "reset")) {
+      ok = Reset();
+    }
+  }
+  if (!ok) {
+    usage();
+  }
+  return ok ? 0 : 1;
+}
