@@ -564,9 +564,7 @@ void CWinShaperDlg::UpdateStatus() {
     if (DeviceIoControl(driver_interface_, SHAPER_IOCTL_GET_STATUS, NULL, 0, &status, sizeof(status), &bytesReturned, NULL) && bytesReturned >= sizeof(status)) {
       int pct = QueuePercent(status.inQueuedBytes, status.params.inBufferBytes);
       m_inboundQueue.SetPos(pct);
-      pct = 0;
-      if (status.params.outBufferBytes > 0)
-        pct = (int)((status.outQueuedBytes * 100LL) / status.params.outBufferBytes);
+      pct = QueuePercent(status.outQueuedBytes, status.params.outBufferBytes);
       m_outboundQueue.SetPos(pct);
     }
   }
