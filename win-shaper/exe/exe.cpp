@@ -253,7 +253,7 @@ int main(int argc, char **argv) {
       for (int i = 2; i < argc; i++) {
         char * separator = strchr(argv[i], '=');
         if (separator) {
-          separator[0] = NULL;
+          separator[0] = '\0';
           const char * option = argv[i];
           const char * value = &separator[1];
           if (!strcmp(option, "inbps")) {
