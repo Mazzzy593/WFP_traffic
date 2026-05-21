@@ -310,3 +310,60 @@ VOID EvtDeviceIOCtl(_In_ WDFQUEUE Queue,
     }
     WdfRequestComplete(Request, status);
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+NTSTATUS ShaperInitDriverObjects(
+    _Inout_ DRIVER_OBJECT* driverObject,
+    _In_ const UNICODE_STRING* registryPath,
+    _Out_ WDFDRIVER* pDriver,
+    _Out_ WDFDEVICE* pDevice) {
+    NTSTATUS status;
+    WDF_DRIVER_CONFIG config;
+    PWDFDEVICE_INIT pInit = NULL;
+    DECLARE_CONST_UNICODE_STRING(ntDeviceName, SHAPER_DEVICE_NAME);
+    DECLARE_CONST_UNICODE_STRING(symbolicName, SHAPER_SYMBOLIC_NAME);
+
+    WDF_DRIVER_CONFIG_INIT(&config, WDF_NO_EVENT_CALLBACK);
+
+    config.DriverInitFlags |= WdfDriverInitNonPnpDriver;
+    config.EvtDriverUnload = ShaperEvtDriverUnload;
+
+    status = WdfDriverCreate(driverObject, registryPath, WDF_NO_OBJECT_ATTRIBUTES,
+        &config, pDriver);
+
+    if (NT_SUCCESS(status)) {
+        pInit = WdfControlDeviceInitAllocate(*pDriver, &SDDL_DEVOBJ_KERNEL_ONLY);
+        if (pInit) {
+            WdfDeviceInitSetDeviceType(pInit, FILE_DEVICE_NETWORK);
+            WdfDeviceInitSetCharacteristics(pInit, FILE_DEVICE_SECURE_OPEN, FALSE);
+
+            // Set up the interface for CreateFile/WriteFile from user mode
+            status = WdfDeviceInitAssignName(pInit, &ntDeviceName);
+            if (NT_SUCCESS(status))
+                WdfDeviceInitAssignSDDLString(pInit, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX);
+            if (NT_SUCCESS(status))
+                status = WdfDeviceCreate(&pInit, WDF_NO_OBJECT_ATTRIBUTES, pDevice);
+            if (NT_SUCCESS(status))
+                status = WdfDeviceCreateSymbolicLink(*pDevice, &symbolicName);
+            if (NT_SUCCESS(status)) {
+                WDF_IO_QUEUE_CONFIG queueConfig;
+                WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchSequential);
+                queueConfig.EvtIoDeviceControl = EvtDeviceIOCtl;
+                status = WdfIoQueueCreate(*pDevice, &queueConfig, WDF_NO_OBJECT_ATTRIBUTES, NULL);
+            }
+            if (NT_SUCCESS(status))
+                wdm_device = WdfDeviceWdmGetDeviceObject(*pDevice);
+
+            if (NT_SUCCESS(status))
+                WdfControlFinishInitializing(*pDevice);
+            else
+                WdfDeviceInitFree(pInit);
+        }
+        else {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+        }
+    }
+
+    return status;
+}
