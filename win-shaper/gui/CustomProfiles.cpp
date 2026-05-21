@@ -14,6 +14,9 @@ CustomProfiles::CustomProfiles() {
     data_file_ = dir + L"profiles.txt";
   }
   Load();
+  static DWORD ProfileByteCount(const CString& out) {
+    return out.GetLength() * sizeof(TCHAR);
+  }
 }
 
 
@@ -31,7 +34,7 @@ void CustomProfiles::Save() {
   CString out = L"";
   int count = (int)profiles_.GetCount();
   for (int i = 0; i < count; i++) {
-    CString profile = profiles_[i].Serialize();
+      DWORD len = ProfileByteCount(out);
     if (!profile.IsEmpty()) {
       out.Append(profile);
       out.Append(L"\n");
