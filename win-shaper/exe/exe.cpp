@@ -181,10 +181,10 @@ bool Remove(bool silent = false) {
 
 bool Set(SHAPER_PARAMS &settings) {
   bool ok = false;
-  HANDLE shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+  HANDLE shaper = OpenDriver();
   if (shaper == INVALID_HANDLE_VALUE) {
     Start();
-    shaper = CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    shaper = OpenDriver();
   }
   if (shaper != INVALID_HANDLE_VALUE) {
     DWORD bytesReturned = 0;
