@@ -216,7 +216,7 @@ void usage() {
          "  inbps: Inbound bandwidth in bits-per-second.\n"
          "  outbps: Outbound bandwidth in bits-per-second.\n"
          "  rtt: Connection latency in milliseconds (half applied inbound and half applied outbound).\n"
-         "  plr: Random packet loss in percent (accurate to 0.01 percent, defaults to 0)"
+         "  plr: Random packet loss in percent (accurate to 0.01 percent, defaults to 0)\n"
          "  inbuff: Inbound buffer size in bytes (defaults to 150,000)\n"
          "  outbuff: Outbound buffer size in bytes (defaults to 150,000)\n"
          "\n"
