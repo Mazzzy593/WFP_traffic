@@ -95,3 +95,73 @@ bool Install() {
   }
   return ok;
 }
+
+
+bool Stop(bool silent = false) {
+  bool ok = false;
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+  if (scm) {
+    SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+    if (service) {
+      DWORD dwBytesNeeded;
+      SERVICE_STATUS_PROCESS status;
+      if (QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded)) {
+        if (status.dwCurrentState == SERVICE_RUNNING) {
+          SERVICE_STATUS s;
+          if (ControlService(service, SERVICE_CONTROL_STOP, &s)) {
+            DWORD count = 0;
+            do {
+              QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded);
+              if (status.dwCurrentState == SERVICE_STOP_PENDING)
+                Sleep(100);
+              count++;
+            } while(status.dwCurrentState == SERVICE_STOP_PENDING && count < 600);
+            if (status.dwCurrentState == SERVICE_STOPPED) {
+              ok = true;
+            } else if (!silent) {
+              printf("Error waiting for service to stop\n");
+            }
+          } else if (!silent) {
+            printf("Failed to stop the service\n");
+          }
+        } else {
+          ok = true;
+        }
+      } else if (!silent) {
+        printf("Failed to query the current service status\n");
+      }
+      CloseServiceHandle(service);
+    } else if (!silent) {
+      printf("Failed to open the shaper service\n");
+    }
+    CloseServiceHandle(scm);
+  } else if (!silent) {
+    printf("Failed to open the Service Control Manager\n");
+  }
+  return ok;
+}
+
+bool Remove(bool silent = false) {
+  bool ok = Stop(silent);
+  if (ok) {
+    ok = false;
+    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+    if (scm) {
+      SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+      if (service) {
+        if (DeleteService(service)) {
+          ok = true;
+        } else if (!silent) {
+          printf("DeleteService failed\n");
+        }
+        CloseServiceHandle(service);
+      } else if (!silent) {
+        printf("Failed to open the shaper service\n");
+      }
+      CloseServiceHandle(scm);
+    } else if (!silent) {
+      printf("Failed to open the Service Control Manager\n");
+    }
+  }
+  return ok;
+}
