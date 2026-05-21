@@ -405,8 +405,12 @@ CString CWinShaperDlg::ExtractDriver() {
     file += "\\winShaper.sys";
     DeleteFile(file);
 
+  #ifdef _WIN64
+    BOOL is64bit = TRUE;
+  #else
     BOOL is64bit = FALSE;
     IsWow64Process(GetCurrentProcess(), &is64bit);
+  #endif
     UINT resource_id = is64bit ? RC_SHAPER_64 : RC_SHAPER_32;
     HRSRC resource = FindResource(g_hInstance, MAKEINTRESOURCE(resource_id), RT_RCDATA);
     if (resource) {
