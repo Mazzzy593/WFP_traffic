@@ -407,9 +407,7 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 
 	////////////////  MDL��ش��룬ֻ��Ϊ�˹���NBLʱʹ��FwpsAllocateNetBufferAndNetBufferList������������Ҫ�ֶ�����MDL  --begin/////////
 	// PMDL!!!!!!!!!!!�ڴ��ͷ����������
-	PMDL pmdl = ExAllocatePoolWithTag(NonPagedPool, sizeof(PMDL), CLONE_DATA_POOL_TAG);
-	if (!pmdl)
-		return FALSE;
+	PMDL pmdl = NULL;
 	// �����������ƬDataPoolforMdl�ռ䣬�����������packetdata�ģ�
 	DataPoolforMdl = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, SELF_MDLDataSize, CLONE_DATA_POOL_TAG);	//����һ���㹻�Ŀռ�
 	if (!DataPoolforMdl) {
@@ -417,6 +415,10 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 	}
 	RtlZeroMemory(DataPoolforMdl, SELF_MDLDataSize);
 	pmdl = IoAllocateMdl(DataPoolforMdl, SELF_MDLDataSize, FALSE, FALSE, NULL);
+	if (pmdl == NULL) {
+		ExFreePoolWithTag(DataPoolforMdl, CLONE_DATA_POOL_TAG);
+		return FALSE;
+	}
 	MmBuildMdlForNonPagedPool(pmdl);
 	/////////////////	MDL��ش���	--end	////////////////////////////////////////////////////////////////////////////////////////////
 	
