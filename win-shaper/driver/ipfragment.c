@@ -373,6 +373,9 @@ BOOLEAN IPFragment(BOOLEAN outbound,
 
 	///////////////// �Ե�һ���NB����ȡ��ͷ����Ϣ������һЩ������ֵ --begin ////////////////////////////////////////////////////////////////
 	PVOID currentMdlStart = MmGetSystemAddressForMdlSafe(NET_BUFFER_CURRENT_MDL(nb), NormalPagePriority);
+	if (currentMdlStart == NULL)
+		return FALSE;
+
 	PUCHAR NetBufferData = (PUCHAR)currentMdlStart + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
 
 	if (!(NetBufferData[12] == 0x08 && NetBufferData[13] == 0x00))  // 12��13��MAC frame type�ֶΣ�0800�����ڲ���IPv4����
