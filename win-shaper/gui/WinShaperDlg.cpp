@@ -29,6 +29,13 @@ static HANDLE OpenDriver() {
   return CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
 }
 
+static int QueuePercent(unsigned __int64 queuedBytes, unsigned __int64 bufferBytes) {
+  if (bufferBytes == 0)
+    return 0;
+  int pct = (int)((queuedBytes * 100LL) / bufferBytes);
+  return pct > 100 ? 100 : pct;
+}
+
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
@@ -555,9 +562,7 @@ void CWinShaperDlg::UpdateStatus() {
     DWORD bytesReturned = 0;
     SHAPER_STATUS status;
     if (DeviceIoControl(driver_interface_, SHAPER_IOCTL_GET_STATUS, NULL, 0, &status, sizeof(status), &bytesReturned, NULL) && bytesReturned >= sizeof(status)) {
-      int pct = 0;
-      if (status.params.inBufferBytes > 0)
-        pct = (int)((status.inQueuedBytes * 100LL) / status.params.inBufferBytes);
+      int pct = QueuePercent(status.inQueuedBytes, status.params.inBufferBytes);
       m_inboundQueue.SetPos(pct);
       pct = 0;
       if (status.params.outBufferBytes > 0)
