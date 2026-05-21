@@ -195,3 +195,52 @@ BOOLEAN IP_get(_Inout_opt_ void* layerData,BOOLEAN is_out)
     DbgPrint("***************print over************");
     return TRUE;
 }
+BOOLEAN IPTestFlag = TRUE;
+
+
+void IPClassify(
+    _In_ const FWPS_INCOMING_VALUES* inFixedValues,
+    _In_ const FWPS_INCOMING_METADATA_VALUES* inMetaValues,
+    _Inout_opt_ void* layerData,
+    _In_opt_ const void* classifyContext,
+    _In_ const FWPS_FILTER* filter,
+    _In_ UINT64 flowContext,
+    _Inout_ FWPS_CLASSIFY_OUT* classifyOut){
+
+    NT_ASSERT(filter);
+    NT_ASSERT(classifyOut);
+
+    UNREFERENCED_PARAMETER(classifyContext);
+    UNREFERENCED_PARAMETER(flowContext);
+
+    // Only bother if we can actually act on the packet
+    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) != 0) {
+        NT_ASSERT(layerData != NULL);
+        _Analysis_assume_(layerData != NULL);
+        BOOLEAN is_out = TRUE;
+        BOOLEAN outbound = inFixedValues->layerId == FWPS_LAYER_OUTBOUND_IPPACKET_V4;
+        if (outbound) {
+            DbgPrint("This is IP Out Classify");
+            if (IPTestFlag) {   // debug用
+                DbgBreakPoint();
+                IPTestFlag = FALSE;
+            }
+            IP_get(layerData,is_out);
+            return;
+        }
+    }
+    return;
+}
+
+
+NTSTATUS IPNotify(
+    _In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
+    _In_ const GUID* filterKey,
+    _Inout_ const FWPS_FILTER* filter) {
+    DbgPrint("This is IP Notify");
+    return STATUS_SUCCESS;
+    UNREFERENCED_PARAMETER(notifyType);
+    UNREFERENCED_PARAMETER(filterKey);
+    UNREFERENCED_PARAMETER(filter);
+    return STATUS_SUCCESS;
+}
