@@ -473,3 +473,81 @@ bool CWinShaperDlg::Start() {
   }
   return running;
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::Stop() {
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+  if (scm) {
+    SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+    if (service) {
+      DWORD dwBytesNeeded;
+      SERVICE_STATUS_PROCESS status;
+      if (QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded)) {
+        if (status.dwCurrentState == SERVICE_RUNNING) {
+          SERVICE_STATUS s;
+          if (ControlService(service, SERVICE_CONTROL_STOP, &s)) {
+            DWORD count = 0;
+            do {
+              QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded);
+              if (status.dwCurrentState == SERVICE_STOP_PENDING)
+                Sleep(100);
+              count++;
+            } while(status.dwCurrentState == SERVICE_STOP_PENDING && count < 10);
+          }
+        }
+      }
+      CloseServiceHandle(service);
+    }
+    CloseServiceHandle(scm);
+  }
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::Error(CString message) {
+  MessageBox(message);
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CAboutDlg::OnNMClickSyslink1(NMHDR *pNMHDR, LRESULT *pResult)
+{
+  ShellExecute(NULL, L"open", L"https://github.com/WPO-Foundation/win-shaper",NULL, NULL,SW_SHOWNORMAL);
+  *pResult = 0;
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CAboutDlg::OnNMReturnSyslink1(NMHDR *pNMHDR, LRESULT *pResult)
+{
+  ShellExecute(NULL, L"open", L"https://github.com/WPO-Foundation/win-shaper",NULL, NULL,SW_SHOWNORMAL);
+  *pResult = 0;
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::OnTimer(UINT_PTR nIDEvent)
+{
+  UpdateStatus();
+  CDialogEx::OnTimer(nIDEvent);
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+void CWinShaperDlg::UpdateStatus() {
+  if (enabled_ && driver_interface_ != INVALID_HANDLE_VALUE) {
+    DWORD bytesReturned = 0;
+    SHAPER_STATUS status;
+    if (DeviceIoControl(driver_interface_, SHAPER_IOCTL_GET_STATUS, NULL, 0, &status, sizeof(status), &bytesReturned, NULL) && bytesReturned >= sizeof(status)) {
+      int pct = 0;
+      if (status.params.inBufferBytes > 0)
+        pct = (int)((status.inQueuedBytes * 100LL) / status.params.inBufferBytes);
+      m_inboundQueue.SetPos(pct);
+      pct = 0;
+      if (status.params.outBufferBytes > 0)
+        pct = (int)((status.outQueuedBytes * 100LL) / status.params.outBufferBytes);
+      m_outboundQueue.SetPos(pct);
+    }
+  }
+}
