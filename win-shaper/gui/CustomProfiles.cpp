@@ -50,7 +50,7 @@ void CustomProfiles::Load() {
   HANDLE hFile = CreateFile(data_file_, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
   if (hFile != INVALID_HANDLE_VALUE) {
     DWORD len = GetFileSize(hFile, NULL);
-    if (len > 0) {
+    if (len != INVALID_FILE_SIZE && len > 0) {
       DWORD buff_len = len + sizeof(TCHAR);
       TCHAR * buff = (TCHAR *)malloc(buff_len);
       if (buff) {
