@@ -25,6 +25,10 @@ static BOOL IsSystem64Bit() {
 #endif
 }
 
+static HANDLE OpenDriver() {
+  return CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+}
+
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
