@@ -393,3 +393,83 @@ void CWinShaperDlg::Uninstall() {
     DeleteFile(driver_path_);
   driver_path_.Empty();
 }
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+CString CWinShaperDlg::ExtractDriver() {
+  CString driver_file;
+  PWSTR path;
+  if (SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &path) == S_OK) {
+    CString file(path);
+    CoTaskMemFree(path);
+    file += "\winShaper.sys";
+    DeleteFile(file);
+
+    BOOL is64bit = FALSE;
+    IsWow64Process(GetCurrentProcess(), &is64bit);
+    UINT resource_id = is64bit ? RC_SHAPER_64 : RC_SHAPER_32;
+    HRSRC resource = FindResource(g_hInstance, MAKEINTRESOURCE(resource_id), RT_RCDATA);
+    if (resource) {
+      HGLOBAL resource_handle = LoadResource(NULL, resource);
+      if (resource_handle) {
+        LPBYTE driver_bits = (LPBYTE)LockResource(resource_handle);
+        DWORD len = SizeofResource(NULL, resource);
+        if (driver_bits && len) {
+          HANDLE hFile = CreateFile(file, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+          if (hFile != INVALID_HANDLE_VALUE) {
+            DWORD written = 0;
+            if (WriteFile(hFile, driver_bits, len, &written, 0) && written == len) {
+              driver_file = file;
+            }
+            CloseHandle(hFile);
+          }
+        }
+      }
+    }
+  }
+  return driver_file;
+}
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+bool CWinShaperDlg::Start() {
+  bool running = false;
+  SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+  if (scm) {
+    SC_HANDLE service = OpenService(scm, SHAPER_SERVICE_NAME, SERVICE_ALL_ACCESS); 
+    if (service) {
+      DWORD dwBytesNeeded;
+      SERVICE_STATUS_PROCESS status;
+      if (QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded)) {
+        if (status.dwCurrentState == SERVICE_STOPPED) {
+          if (StartService(service, 0, NULL)) {
+            DWORD count = 0;
+            do {
+              QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(SERVICE_STATUS_PROCESS), &dwBytesNeeded);
+              if (status.dwCurrentState == SERVICE_START_PENDING)
+                Sleep(100);
+              count++;
+            } while(status.dwCurrentState == SERVICE_START_PENDING && count < 600);
+            if (status.dwCurrentState == SERVICE_RUNNING)
+              running = true;
+            else
+              Error(L"Error waiting for service to start");
+          } else {
+            Error(L"Failed to start the service");
+          }
+        } else {
+          running = true;
+        }
+      } else {
+        Error(L"Failed to query the current service status");
+      }
+      CloseServiceHandle(service);
+    } else {
+      Error(L"Failed to open the shaper service to start the driver");
+    }
+    CloseServiceHandle(scm);
+  } else {
+    Error(L"Failed to open the Service Control Manager to start the driver");
+  }
+  return running;
+}
