@@ -25,6 +25,9 @@ CustomProfiles::~CustomProfiles() {
 /*-----------------------------------------------------------------------------
 -----------------------------------------------------------------------------*/
 void CustomProfiles::Save() {
+  if (data_file_.IsEmpty())
+    return;
+
   CString out = L"";
   int count = (int)profiles_.GetCount();
   for (int i = 0; i < count; i++) {
@@ -47,6 +50,9 @@ void CustomProfiles::Save() {
 void CustomProfiles::Load() {
   if (!profiles_.IsEmpty())
     profiles_.RemoveAll();
+  if (data_file_.IsEmpty())
+    return;
+
   HANDLE hFile = CreateFile(data_file_, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
   if (hFile != INVALID_HANDLE_VALUE) {
     DWORD len = GetFileSize(hFile, NULL);
