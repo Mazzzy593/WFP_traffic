@@ -213,3 +213,100 @@ void ShaperEvtDriverUnload(_In_ WDFDRIVER driverObject) {
 
     Cleanup();
 }
+
+
+/*-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------*/
+VOID EvtDeviceIOCtl(_In_ WDFQUEUE Queue,
+    _In_ WDFREQUEST Request,
+    _In_ size_t OutputBufferLength,
+    _In_ size_t InputBufferLength,
+    _In_ ULONG IoControlCode) {
+    UNREFERENCED_PARAMETER(Queue);
+    UNREFERENCED_PARAMETER(Request);
+    UNREFERENCED_PARAMETER(OutputBufferLength);
+    UNREFERENCED_PARAMETER(InputBufferLength);
+    NTSTATUS status = STATUS_SUCCESS;
+    switch (IoControlCode) {
+    case SHAPER_IOCTL_DISABLE: {
+        if (!ShaperDisable())
+            status = STATUS_INVALID_PARAMETER;
+        break;
+    }
+    case SHAPER_IOCTL_ENABLE: {
+        if (InputBufferLength >= sizeof(SHAPER_PARAMS)) {
+            WDFMEMORY pMemory;
+            SHAPER_PARAMS* settings;
+            status = WdfRequestRetrieveInputMemory(Request, &pMemory);
+            if (NT_SUCCESS(status)) {
+                settings = (SHAPER_PARAMS*)WdfMemoryGetBuffer(pMemory, NULL);
+                if (settings) {
+                    if (!ShaperEnable(settings->plr,
+                        settings->inBps,
+                        settings->outBps,
+                        settings->inLatency,
+                        settings->outLatency,
+                        settings->inBufferBytes,
+                        settings->outBufferBytes)) {
+                        status = STATUS_INVALID_PARAMETER;
+                    }
+                }
+                else {
+                    status = STATUS_INVALID_PARAMETER;
+                }
+            }
+        }
+        else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        break;
+    }
+    case SHAPER_IOCTL_GET_STATUS: {
+        if (OutputBufferLength >= sizeof(SHAPER_STATUS)) {
+            WDFMEMORY pMemory;
+            SHAPER_STATUS* shaper_status;
+            status = WdfRequestRetrieveOutputMemory(Request, &pMemory);
+            if (NT_SUCCESS(status)) {
+                shaper_status = (SHAPER_STATUS*)WdfMemoryGetBuffer(pMemory, NULL);
+                if (shaper_status) {
+                    ShaperGetStatus(shaper_status);
+                    WdfRequestSetInformation(Request, sizeof(SHAPER_STATUS));
+                }
+                else {
+                    status = STATUS_INVALID_PARAMETER;
+                }
+            }
+        }
+        else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        break;
+    }
+    case SHAPER_IOCTL_GET_STATS: {
+        if (OutputBufferLength >= sizeof(SHAPER_STATS)) {
+            WDFMEMORY pMemory;
+            SHAPER_STATS* shaper_stats;
+            status = WdfRequestRetrieveOutputMemory(Request, &pMemory);
+            if (NT_SUCCESS(status)) {
+                shaper_stats = (SHAPER_STATS*)WdfMemoryGetBuffer(pMemory, NULL);
+                if (shaper_stats) {
+                    ShaperGetStats(shaper_stats);
+                    WdfRequestSetInformation(Request, sizeof(SHAPER_STATS));
+                }
+                else {
+                    status = STATUS_INVALID_PARAMETER;
+                }
+            }
+        }
+        else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        break;
+    }
+    default: {
+        DbgPrint("[shaper] IOCTL unknown command - %lu\n", IoControlCode);
+        status = STATUS_INVALID_PARAMETER;
+    }
+    }
+    WdfRequestComplete(Request, status);
+}
