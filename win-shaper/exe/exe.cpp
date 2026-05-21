@@ -9,6 +9,9 @@
 
 #include "../driver/interface.h"
 
+static const DWORD SERVICE_WAIT_INTERVAL_MS = 100;
+static const DWORD SERVICE_WAIT_ATTEMPTS = 600;
+
 static HANDLE OpenDriver() {
   return CreateFile(SHAPER_DOS_NAME, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
 }
