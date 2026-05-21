@@ -88,3 +88,64 @@ NTSTATUS WaitForWFP();
 
 /******************************************************************************
 ******************************************************************************/
+
+/*-----------------------------------------------------------------------------
+  Main driver entry point
+-----------------------------------------------------------------------------*/
+NTSTATUS DriverEntry(DRIVER_OBJECT* driverObject, UNICODE_STRING* registryPath) {
+    WDFDRIVER driver = NULL;
+    WDFDEVICE device = NULL;
+    NTSTATUS status = WaitForWFP();
+    DbgPrint("This is Driver Entry");
+    // Request NX Non-Paged Pool when available
+    if (NT_SUCCESS(status)) {
+        ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
+        status = ShaperInitDriverObjects(driverObject, registryPath, &driver, &device);
+    }
+
+    if (NT_SUCCESS(status)) {
+        FwpsInjectionHandleCreate(AF_INET, FWPS_INJECTION_TYPE_L2, &ih_out_ipv4);
+        FwpsInjectionHandleCreate(AF_INET6, FWPS_INJECTION_TYPE_L2, &ih_out_ipv6);
+        FwpsInjectionHandleCreate(AF_UNSPEC, FWPS_INJECTION_TYPE_L2, &ih_out_unspecified);
+        FwpsInjectionHandleCreate(AF_INET, FWPS_INJECTION_TYPE_L2, &ih_in_ipv4);
+        FwpsInjectionHandleCreate(AF_INET6, FWPS_INJECTION_TYPE_L2, &ih_in_ipv6);
+        FwpsInjectionHandleCreate(AF_UNSPEC, FWPS_INJECTION_TYPE_L2, &ih_in_unspecified);
+    }
+
+    if (NT_SUCCESS(status))
+        status = InitializePacketQueues(device);
+
+    if (NT_SUCCESS(status))
+        DbgPrint("This is Callouts");
+        status = RegisterCallouts(wdm_device);
+
+    if (!NT_SUCCESS(status))
+        Cleanup();
+
+    return status;
+};
+
+/*-----------------------------------------------------------------------------
+  Wait for WFP to start in case we were loaded at boot time
+-----------------------------------------------------------------------------*/
+NTSTATUS WaitForWFP() {
+    NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
+    FWPM_SERVICE_STATE  state;
+
+    state = FwpmBfeStateGet0();
+    if (state != FWPM_SERVICE_RUNNING) {
+        LARGE_INTEGER delay;
+        delay.QuadPart = (-5000000);   // wait 500000us (500ms) relative
+        DWORD count = 1200;            // wait up to 10 minutes at most
+        do {
+            KeDelayExecutionThread(KernelMode, FALSE, &delay);
+            state = FwpmBfeStateGet0();
+            count--;
+        } while (state != FWPM_SERVICE_RUNNING && count > 0);
+    }
+
+    if (state == FWPM_SERVICE_RUNNING)
+        status = STATUS_SUCCESS;
+
+    return status;
+}
