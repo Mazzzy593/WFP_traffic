@@ -15,6 +15,16 @@
 
 extern HINSTANCE g_hInstance;
 
+static BOOL IsSystem64Bit() {
+#ifdef _WIN64
+  return TRUE;
+#else
+  BOOL is64bit = FALSE;
+  IsWow64Process(GetCurrentProcess(), &is64bit);
+  return is64bit;
+#endif
+}
+
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
