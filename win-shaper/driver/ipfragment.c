@@ -241,14 +241,16 @@ BOOLEAN IPFragment_inbound(_Inout_opt_ void* layerData, PNET_BUFFER_LIST* pCopyL
 			// ��ΪAllocateSize�����滻�����⣬�����˲���bug
 			UINT AllocateSize = remainDataLen > SELF_MTU ? SELF_MDLDataSize : remainDataLen + 34 + 0x20;
 
-			PMDL pmdl = ExAllocatePoolWithTag(NonPagedPool, sizeof(PMDL), CLONE_DATA_POOL_TAG);
-			if (!pmdl)
-				return FALSE;
+			PMDL pmdl = NULL;
 			DataPoolforMdl = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, AllocateSize, CLONE_DATA_POOL_TAG);	//����һ���ʵ��Ŀռ�
 			if (!DataPoolforMdl)
 				return FALSE;
 			RtlZeroMemory(DataPoolforMdl, AllocateSize);
 			pmdl = IoAllocateMdl(DataPoolforMdl, AllocateSize, FALSE, FALSE, NULL);
+			if (pmdl == NULL) {
+				ExFreePoolWithTag(DataPoolforMdl, CLONE_DATA_POOL_TAG);
+				return FALSE;
+			}
 			MmBuildMdlForNonPagedPool(pmdl);
 
 			PNET_BUFFER_LIST tmpNBL = (PNET_BUFFER_LIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(NET_BUFFER_LIST), CLONE_DATA_POOL_TAG);
