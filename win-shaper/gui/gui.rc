@@ -72,3 +72,77 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDR_MAINFRAME           ICON                    "res\\gui.ico"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 223, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About winShaper"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "winShaper 1.0",IDC_STATIC,7,7,114,8,SS_NOPREFIX
+    DEFPUSHBUTTON   "OK",IDOK,166,87,50,14,WS_GROUP
+    CONTROL         "winShaper is UI for WebPageTest's open source packet-level traffic-shaping network filter. \n\nThe UI and driver projects are on GitHub:\n<a>https://github.com/WPO-Foundation/win-shaper</a>",IDC_SYSLINK1,
+                    "SysLink",WS_TABSTOP,7,25,209,45
+END
+
+IDD_GUI_DIALOG DIALOGEX 0, 0, 263, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Windows Network Shaper"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    COMBOBOX        IDC_CONNECTION_PROFILES,7,18,249,118,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Connection Profile:",IDC_STATIC,7,7,62,8
+    DEFPUSHBUTTON   "Enable",IDC_ENABLE,199,35,57,20
+    CONTROL         "",IDC_INBOUND_QUEUE,"msctls_progress32",PBS_SMOOTH | WS_DISABLED,70,36,113,8
+    LTEXT           "Inbound Queue:",IDC_STATIC,7,36,54,8
+    LTEXT           "Outbound Queue:",IDC_STATIC,7,46,59,8
+    CONTROL         "",IDC_OUTBOUND_QUEUE,"msctls_progress32",PBS_SMOOTH | WS_DISABLED,70,46,113,8
+END
+
+IDD_CUSTOM_PROFILES DIALOGEX 0, 0, 309, 268
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Custom Profiles"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,252,228,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,252,247,50,14
+    LISTBOX         IDC_LIST1,7,7,238,254,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Add",IDC_ADD,252,7,50,14
+    PUSHBUTTON      "&Delete",IDC_DELETE,252,45,50,14,WS_DISABLED
+    PUSHBUTTON      "&Edit",IDC_EDIT,252,26,50,14,WS_DISABLED
+END
+
+IDD_CUSTOM_PROFILE DIALOGEX 0, 0, 205, 157
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Custom Profile"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,94,136,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,148,136,50,14
+    LTEXT           "Name:",IDC_STATIC,7,9,37,11
+    EDITTEXT        IDC_NAME,35,7,161,12,ES_AUTOHSCROLL
+    LTEXT           "Bandwidth in:",IDC_STATIC,7,25,59,11
+    LTEXT           "Bandwidth out:",IDC_STATIC,7,41,59,11
+    LTEXT           "Latency:",IDC_STATIC,7,57,59,11
+    LTEXT           "Packet Loss:",IDC_STATIC,7,73,59,11
+    LTEXT           "Inbound Buffer Size:",IDC_STATIC,7,89,69,11
+    LTEXT           "Outbound Buffer Size:",IDC_STATIC,7,105,77,11
+    LTEXT           "Bytes",IDC_STATIC,145,105,43,11
+    LTEXT           "Bytes",IDC_STATIC,145,89,43,11
+    LTEXT           "%",IDC_STATIC,145,73,43,11
+    LTEXT           "milliseconds",IDC_STATIC,145,57,43,11
+    LTEXT           "bits per second",IDC_STATIC,145,41,57,11
+    LTEXT           "bits per second",IDC_STATIC,145,25,57,11
+    EDITTEXT        IDC_IN_BPS,60,23,82,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_OUT_BPS,60,39,82,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_RTT,108,55,34,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_PLR,108,71,34,12,ES_RIGHT | ES_AUTOHSCROLL
+    EDITTEXT        IDC_IN_BUFF_LEN,79,87,64,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_OUT_BUFF_LEN,79,103,64,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+END
