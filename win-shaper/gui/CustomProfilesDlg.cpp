@@ -78,3 +78,63 @@ void CustomProfilesDlg::OnBnClickedAdd() {
     m_profileList.InsertString(index, profile.DisplayString());
   }
 }
+
+
+void CustomProfilesDlg::OnBnClickedEdit() {
+  int index = m_profileList.GetCurSel();
+  if (index >= 0 && index < profiles_.profiles_.GetCount()) {
+    ConnectionProfile &profile = profiles_.profiles_[index];
+    CustomProfileDlg dlg;
+    dlg.m_name = profile.name_;
+    dlg.m_inBps = profile.inBps_;
+    dlg.m_outBps = profile.outBps_;
+    dlg.m_rtt = profile.rtt_;
+    dlg.m_plr = (double)profile.plr_ / 100.0;
+    dlg.m_inBufferLength = profile.inBufferLen_;
+    dlg.m_outBufferLen = profile.outBufferLen_;
+    if (dlg.DoModal() == IDOK) {
+      profile.name_ = dlg.m_name;
+      profile.inBps_ = dlg.m_inBps;
+      profile.outBps_ = dlg.m_outBps;
+      profile.rtt_ = dlg.m_rtt;
+      profile.plr_ = (int)(dlg.m_plr * 100.0);
+      profile.inBufferLen_ = dlg.m_inBufferLength;
+      profile.outBufferLen_ = dlg.m_outBufferLen;
+      m_profileList.SetRedraw(FALSE);
+      m_profileList.DeleteString(index);
+      m_profileList.InsertString(index, profile.DisplayString());
+      m_profileList.SetRedraw(TRUE);
+    }
+  }
+}
+
+
+void CustomProfilesDlg::OnBnClickedDelete() {
+  int index = m_profileList.GetCurSel();
+  int count = (int)profiles_.profiles_.GetCount();
+  if (index >= 0 && index < count) {
+    if (MessageBox(L"Are you sure you want to delete the connection:\n" + profiles_.profiles_[index].DisplayString(), 0, MB_YESNO) == IDYES) {
+      count--;
+      profiles_.profiles_.RemoveAt(index);
+      m_profileList.DeleteString(index);
+      index = max(0, index - 1);
+      m_profileList.SetCurSel(index);
+    }
+  }
+  if (profiles_.profiles_.IsEmpty()) {
+    m_btnEdit.EnableWindow(FALSE);
+    m_btnDelete.EnableWindow(FALSE);
+  }
+}
+
+
+void CustomProfilesDlg::OnBnClickedOk() {
+  profiles_.Save();
+  CDialogEx::OnOK();
+}
+
+void CustomProfilesDlg::OnLbnSelchangeList1()
+{
+  m_btnEdit.EnableWindow(TRUE);
+  m_btnDelete.EnableWindow(TRUE);
+}
