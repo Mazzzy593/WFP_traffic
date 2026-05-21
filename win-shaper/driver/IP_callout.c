@@ -351,8 +351,6 @@ BOOLEAN TCPandIPfragment(_In_ const FWPS_INCOMING_VALUES* inFixedValues,   // �
 	ULONG remainDataLen = payloadLen;	// ʣ���ֽڳ���
 	UINT32 currentSeqNum = pTCPHeader->sequenceNumber;
 	
-	CopyLayerdata = (PNET_BUFFER_LIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(NET_BUFFER_LIST), TCPCALLOUT_POOL_TAG);
-
 	//����һ����NBL������NB��NB�в�û��MDL
 	FwpsAllocateNetBufferAndNetBufferList(nblPoolHandle, 0, 0, NULL, 0, 0, &CopyLayerdata);
 	currentNB = NET_BUFFER_LIST_FIRST_NB(CopyLayerdata);
