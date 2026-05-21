@@ -58,9 +58,8 @@ void CustomProfiles::Load() {
     DWORD len = GetFileSize(hFile, NULL);
     if (len != INVALID_FILE_SIZE && len > 0) {
       DWORD buff_len = len + sizeof(TCHAR);
-      TCHAR * buff = (TCHAR *)malloc(buff_len);
+      TCHAR * buff = (TCHAR *)calloc(1, buff_len);
       if (buff) {
-        memset(buff, 0, buff_len);
         DWORD bytes_read;
         if (ReadFile(hFile, buff, len, &bytes_read, 0) && len == bytes_read) {
           CString in(buff);
